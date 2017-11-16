@@ -1,0 +1,15 @@
+AM_CFLAGS =
+	$(WARNING_CFLAGS) \
+	$(CODE_COVERAGE_CFLAGS)
+
+AM_LDFLAGS = \
+	$(CODE_COVERAGE_LDFLAGS)
+
+AM_CPPFLAGS =
+
+libexec_PROGRAMS = \
+	flux-imp
+
+flux_imp_SOURCES = \
+	imp.c
+	
