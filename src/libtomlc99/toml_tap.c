@@ -21,6 +21,10 @@
     timeout = 1.5E3\n\
 "
 
+bool validate_toml_table (toml_table_t *conf, char *errbuf, int errsize);
+bool validate_toml_array (toml_array_t *array, char *errbuf, int errsize);
+bool validate_toml_value (const char *raw, char *errbuf, int errsize);
+
 void parse_ex1 (void)
 {
     char errbuf[255];
@@ -85,6 +89,90 @@ void parse_ex1 (void)
     free (host);
 }
 
+bool validate_toml_value (const char *raw, char *errbuf, int errsize)
+{
+    char *str;
+    int i;
+    int64_t i64;
+    double d;
+    struct toml_timestamp_t ts;
+
+    if (toml_rtos (raw, &str) == 0) {
+        free (str);
+        return true;
+    }
+    else if (toml_rtob (raw, &i) == 0)
+        return true;
+    else if (toml_rtoi (raw, &i64) == 0)
+        return true;
+    else if (toml_rtod (raw, &d) == 0)
+        return true;
+    else if (toml_rtots (raw, &ts) == 0)
+        return true;
+
+    snprintf (errbuf, errsize, "%s is an invalid value", raw);
+    return false;
+}
+
+bool validate_toml_array (toml_array_t *array, char *errbuf, int errsize)
+{
+    int i;
+    const char *raw;
+    toml_array_t *arr;
+    toml_table_t *tab;
+
+    switch (toml_array_kind (array)) {
+        case 'v':
+            for (i = 0; (raw = toml_raw_at (array, i)); i++) {
+                if (!validate_toml_value (raw, errbuf, errsize))
+                    return false;
+            }
+            break;
+        case 'a':
+            for (i = 0; (arr = toml_array_at (array, i)); i++) {
+                if (!validate_toml_array (arr, errbuf, errsize))
+                    return false;
+            }
+            break;
+        case 't':
+            for (i = 0; (tab = toml_table_at (array, i)); i++) {
+                if (!validate_toml_table (tab, errbuf, errsize))
+                    return false;
+            }
+            break;
+    }
+    return true;
+}
+
+bool validate_toml_table (toml_table_t *conf, char *errbuf, int errsize)
+{
+    int i;
+    const char *key;
+    const char *raw;
+    toml_array_t *arr;
+    toml_table_t *tab;
+
+    for (i = 0; (key = toml_key_in (conf, i)); i++) {
+        if ((raw = toml_raw_in (conf, key))) { // value
+            if (!validate_toml_value (raw, errbuf, errsize))
+                return false;
+        }
+        else if ((arr = toml_array_in (conf, key))) { // array
+            if (!validate_toml_array (arr, errbuf, errsize))
+                return false;
+        }
+        else if ((tab = toml_table_in (conf, key))) { // table
+            if (!validate_toml_table (tab, errbuf, errsize))
+                return false;
+        }
+        else {
+            snprintf (errbuf, errsize, "key=%s is invalid", key);
+            return false;
+        }
+    }
+    return true;
+}
+
 /* return true if file can be opened and parsing fails
  */
 bool parse_bad_file (const char *path, char *errbuf, int errsize)
@@ -98,10 +186,13 @@ bool parse_bad_file (const char *path, char *errbuf, int errsize)
     }
     conf = toml_parse_file (fp, errbuf, errsize);
     if (conf != NULL) {
+        if (validate_toml_table (conf, errbuf, errsize)) {
+            toml_free (conf);
+            fclose (fp);
+            snprintf (errbuf, errsize, "success");
+            return false;
+        }
         toml_free (conf);
-        fclose (fp);
-        snprintf (errbuf, errsize, "success");
-        return false;
     }
     fclose (fp);
     return true;
@@ -113,13 +204,7 @@ struct entry {
 };
 
 const struct entry bad_input_blacklist[] = {
-    { "datetime-malformed-no-leads.toml",   "parses" },
-    { "datetime-malformed-no-secs.toml",    "parses" },
-    { "datetime-malformed-no-t.toml",       "parses" },
-    { "datetime-malformed-with-milli.toml", "parses" },
-    { "float-no-leading-zero.toml",         "parses" },
-    { "float-no-trailing-digits.toml",      "parses" },
-    { "table-array-implicit.toml" ,         "segfault" },
+    { "table-array-implicit.toml" ,         "segfault, cktan/tomlc99#3" },
     { NULL, NULL },
 };
 
@@ -176,6 +261,11 @@ bool parse_good_file (const char *path, char *errbuf, int errsize)
     conf = toml_parse_file (fp, errbuf, errsize);
     if (conf == NULL) {
         fclose (fp);
+        return false;
+    }
+    if (!validate_toml_table (conf, errbuf, errsize)) {
+        fclose (fp);
+        toml_free (conf);
         return false;
     }
     toml_free (conf);
