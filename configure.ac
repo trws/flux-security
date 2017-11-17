@@ -62,6 +62,10 @@ LT_INIT
 #
 AC_HEADER_STDC
 
+#
+#  Checks for packages
+#
+PKG_CHECK_MODULES([SODIUM], [libsodium], [], [])
 
 #
 #  Other checks
