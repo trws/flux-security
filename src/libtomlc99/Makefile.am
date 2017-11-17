@@ -1,6 +1,7 @@
 AM_CFLAGS = \
 	-I$(top_srcdir) \
 	$(WARNING_CFLAGS) \
+	-Wno-unused-parameter \
 	$(CODE_COVERAGE_CFLAGS)
 
 AM_LDFLAGS = \

@@ -139,7 +139,7 @@ void parse_bad_input (void)
     char pattern[PATH_MAX];
     int flags = 0;
     glob_t results;
-    int i;
+    unsigned i;
 
     snprintf (pattern, sizeof (pattern), "%s/*.toml", TEST_BAD_INPUT);
     if (glob (pattern, flags, NULL, &results) != 0)
@@ -189,7 +189,7 @@ void parse_good_input (void)
     char pattern[PATH_MAX];
     int flags = 0;
     glob_t results;
-    int i;
+    unsigned i;
 
     snprintf (pattern, sizeof (pattern), "%s/*.toml", TEST_GOOD_INPUT);
     if (glob (pattern, flags, NULL, &results) != 0)
