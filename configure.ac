@@ -14,7 +14,7 @@ AC_CANONICAL_SYSTEM
 #
 #  Automake support:
 #
-AM_INIT_AUTOMAKE([subdir-objects])
+AM_INIT_AUTOMAKE([subdir-objects tar-pax])
 AM_SILENT_RULES([yes])
 AM_CONFIG_HEADER([config/config.h])
 AM_MAINTAINER_MODE
