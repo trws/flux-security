@@ -204,7 +204,6 @@ struct entry {
 };
 
 const struct entry bad_input_blacklist[] = {
-    { "table-array-implicit.toml" ,         "segfault, cktan/tomlc99#3" },
     { NULL, NULL },
 };
 
