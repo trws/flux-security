@@ -1,6 +1,6 @@
 AM_CFLAGS = \
 	$(WARNING_CFLAGS) \
-	-Wno-sign-compare -Wno-unused-parameter \
+	-Wno-sign-compare -Wno-unused-parameter -Wno-parentheses \
 	$(CODE_COVERAGE_CFLAGS)
 
 AM_LDFLAGS = \
