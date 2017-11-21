@@ -1,12 +1,11 @@
 language: c
 sudo: false
 
-compiler:
-  - gcc
-  - clang
-
 matrix:
   include:
+    - compiler: gcc
+      env: MAKECMDS="make && make distcheck"
+    - compiler: clang
     - compiler: gcc-5
       env: CC=gcc-5 COVERAGE=t ARGS="--enable-code-coverage" MAKECMDS="make && make check-code-coverage && lcov -l flux*-coverage.info"
     - compiler: gcc-7
