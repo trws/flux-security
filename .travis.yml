@@ -1,22 +1,39 @@
 language: c
 sudo: false
 
-compiler:
-  - gcc
-  - clang
+matrix:
+  include:
+    - compiler: gcc
+      env: MAKECMDS="make && make distcheck"
+    - compiler: clang
+    - compiler: gcc-5
+      env: CC=gcc-5 COVERAGE=t ARGS="--enable-code-coverage" MAKECMDS="make && make check-code-coverage && lcov -l flux*-coverage.info"
+    - compiler: gcc-7
+      env: CC=gcc-7
+    - compiler: clang-4.0
+      env: CC=clang-4.0
 
 addons:
   apt:
-  packages:
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-trusty-4.0
+    packages:
+      - gcc-5
+      - gcc-7
+      - clang-4.0
+      - lcov
 
 before_install:
   - curl -L -O --insecure https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz
   - tar -xf libsodium-1.0.10.tar.gz
-  - cd libsodium-1.0.10 && ./configure --prefix=$HOME/local && make && make install
+  - (cd libsodium-1.0.10 && ./configure --prefix=$HOME/local && make && make install)
   - export PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/share/pkgconfig
 
 script:
   - ./autogen.sh
-  - ./configure
-  - make
-  - make check
+  - ./configure ${ARGS}
+  - eval ${MAKECMDS:-make && make check}
+
+after_success:
+  - if test "$COVERAGE" = "t"; then bash <(curl -s https://codecov.io/bash); fi
