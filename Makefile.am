@@ -8,6 +8,8 @@ EXTRA_DIST = \
 # coverage
 CODE_COVERAGE_IGNORE_PATTERN = \
         "/t/*" \
+	"*_test.c" \
+	"test/*.c" \
 	"libtap/*" \
 	"/usr/*"
 CODE_COVERAGE_LCOV_OPTIONS =
