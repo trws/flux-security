@@ -66,6 +66,7 @@ AC_HEADER_STDC
 #  Checks for packages
 #
 PKG_CHECK_MODULES([SODIUM], [libsodium], [], [])
+PKG_CHECK_MODULES([JANSSON], [jansson], [], [])
 
 #
 #  Other checks
