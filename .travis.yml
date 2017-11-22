@@ -23,6 +23,7 @@ addons:
       - gcc-7
       - clang-4.0
       - lcov
+      - libjansson-dev
 
 before_install:
   - curl -L -O --insecure https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz
