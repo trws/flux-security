@@ -209,6 +209,39 @@ void test_sign_verify (void)
     flux_sigcert_destroy (cert2);
 }
 
+void test_json_load_dump (void)
+{
+    struct flux_sigcert *cert;
+    struct flux_sigcert *cert_pub;
+    char *s, *sig;
+    uint8_t message[] = "bad-kitty-my-pot-pie";
+
+    if (!(cert = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create: %s", strerror (errno));
+
+    /* dump/load through JSON functions, creating a second cert with
+     * public key only
+     */
+    s = flux_sigcert_json_dumps (cert);
+    ok (s != NULL,
+        "flux_sigcert_json_dumps works");
+    cert_pub = flux_sigcert_json_loads (s);
+    ok (cert_pub != NULL,
+        "flux_sigcert_json_loads works");
+
+    /* sign with cert, verify with public cert
+     */
+    if (!(sig = flux_sigcert_sign (cert, message, sizeof (message))))
+        BAIL_OUT ("flux_sigcert_sign: %s", strerror (errno));
+    ok (flux_sigcert_verify (cert_pub, sig, message, sizeof (message)) == 0,
+        "verified sig with pub cert after json_dumps/loads");
+
+    free (sig);
+    free (s);
+    flux_sigcert_destroy (cert);
+    flux_sigcert_destroy (cert_pub);
+}
+
 void test_corner (void)
 {
     struct flux_sigcert *cert;
@@ -270,6 +303,24 @@ void test_corner (void)
     ok (flux_sigcert_verify (cert, "....", NULL, 0) < 0 && errno == EINVAL,
         "flux_sigcert_verify sig=invalid fails with EINVAL");
 
+    /* json_dumps/loads corner cases
+     */
+    errno = 0;
+    ok (flux_sigcert_json_dumps (NULL) == NULL && errno == EINVAL,
+        "flux_sigcert_json_dumps cert=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_json_loads (NULL) == NULL && errno == EINVAL,
+        "flux_sigcert_json_loads s=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_json_loads ("") == NULL && errno == EPROTO,
+        "flux_sigcert_json_loads s=empty fails with EPROTO");
+    errno = 0;
+    ok (flux_sigcert_json_loads ("{") == NULL && errno == EPROTO,
+        "flux_sigcert_json_loads s=invalid fails with EPROTO");
+    errno = 0;
+    ok (flux_sigcert_json_loads ("{\"curve\":{}}") == NULL && errno == EPROTO,
+        "flux_sigcert_json_loads s=valid/wrong fails with EPROTO");
+
     /* Destroy NULL
      */
     lives_ok ({flux_sigcert_destroy (NULL);},
@@ -284,6 +335,8 @@ int main (int argc, char *argv[])
 
     test_load_store ();
     test_sign_verify();
+    test_json_load_dump ();
+
     test_corner ();
 
     done_testing ();
