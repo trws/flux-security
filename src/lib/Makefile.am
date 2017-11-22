@@ -5,11 +5,11 @@ AM_CFLAGS = \
 
 AM_LDFLAGS = \
 	$(CODE_COVERAGE_LIBS) \
-	$(SODIUM_LIBS)
+	$(SODIUM_LIBS) $(JANSSON_LIBS)
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
-	$(SODIUM_CFLAGS)
+	$(SODIUM_CFLAGS) $(JANSSON_CFLAGS)
 
 noinst_LTLIBRARIES = \
 	libflux-security.la

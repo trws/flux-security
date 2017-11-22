@@ -34,6 +34,14 @@ struct flux_sigcert *flux_sigcert_load (const char *name);
  */
 int flux_sigcert_store (struct flux_sigcert *cert, const char *name);
 
+/* Decode JSON string to cert.
+ */
+struct flux_sigcert *flux_sigcert_json_loads (const char *s);
+
+/* Encode public cert to JSON string.  Caller must free.
+ */
+char *flux_sigcert_json_dumps (struct flux_sigcert *cert);
+
 /* Return true if two certificates have the same keys.
  */
 bool flux_sigcert_equal (struct flux_sigcert *cert1,
