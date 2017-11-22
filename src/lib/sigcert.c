@@ -37,6 +37,7 @@
 #include <string.h>
 #include <limits.h>
 #include <sodium.h>
+#include <jansson.h>
 
 #include "src/libtomlc99/toml.h"
 #include "src/libutil/base64.h"
@@ -278,6 +279,74 @@ error:
     toml_free (cert_table);
     if (fp)
         fclose (fp);
+    flux_sigcert_destroy (cert);
+    errno = saved_errno;
+    return NULL;
+}
+
+char *flux_sigcert_json_dumps (struct flux_sigcert *cert)
+{
+    json_t *obj = NULL;
+    char *xpub = NULL;
+    int saved_errno;
+    char *s;
+
+    if (!cert) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (!(xpub = sigcert_base64_encode (cert->public_key,
+                                                crypto_sign_PUBLICKEYBYTES)))
+        goto error;
+    if (!(obj = json_pack ("{s:{s:s}}", "curve", "public-key", xpub))) {
+        errno = ENOMEM;
+        goto error;
+    }
+    if (!(s = json_dumps (obj, JSON_COMPACT))) {
+        errno = ENOMEM;
+        goto error;
+    }
+    json_decref (obj);
+    free (xpub);
+    return s;
+error:
+    saved_errno = errno;
+    json_decref (obj);
+    free (xpub);
+    errno = saved_errno;
+    return NULL;
+}
+
+struct flux_sigcert *flux_sigcert_json_loads (const char *s)
+{
+    json_t *obj = NULL;
+    struct flux_sigcert *cert = NULL;
+    const char *xpub;
+    int saved_errno;
+
+    if (!s) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (!(cert = calloc (1, sizeof (*cert))))
+        return NULL;
+    cert->magic = FLUX_SIGCERT_MAGIC;
+    if (!(obj = json_loads (s, 0, NULL))) {
+        errno = EPROTO;
+        goto error;
+    }
+    if (json_unpack (obj, "{s{s:s}}", "curve", "public-key", &xpub) < 0) {
+        errno = EPROTO;
+        goto error;
+    }
+    if (sigcert_base64_decode (xpub, cert->public_key,
+                               crypto_sign_PUBLICKEYBYTES) < 0)
+        goto error;
+    json_decref (obj);
+    return cert;
+error:
+    saved_errno = errno;
+    json_decref (obj);
     flux_sigcert_destroy (cert);
     errno = saved_errno;
     return NULL;
