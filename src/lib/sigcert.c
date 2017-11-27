@@ -55,6 +55,7 @@ struct flux_sigcert {
     uint8_t secret_key[crypto_sign_SECRETKEYBYTES];
 
     bool sodium_initialized;
+    bool secret_valid;
 };
 
 void flux_sigcert_destroy (struct flux_sigcert *cert)
@@ -84,6 +85,7 @@ struct flux_sigcert *flux_sigcert_create (void)
     cert->sodium_initialized = true;
     if (crypto_sign_keypair (cert->public_key, cert->secret_key) < 0)
         goto error;
+    cert->secret_valid = true;
     return cert;
 error:
     flux_sigcert_destroy (cert);
@@ -163,7 +165,7 @@ int flux_sigcert_store (struct flux_sigcert *cert, const char *name)
     char name_pub[pubsz];
     int saved_errno;
 
-    if (!cert || !name || strlen (name) == 0) {
+    if (!cert || !cert->secret_valid || !name || strlen (name) == 0) {
         errno = EINVAL;
         goto error;
     }
@@ -255,6 +257,7 @@ struct flux_sigcert *flux_sigcert_load (const char *name)
             goto inval;
         }
         free (s);
+        cert->secret_valid = true;
     }
     if ((raw = toml_raw_in (curve_table, "public-key"))) { // required
         char *s;
@@ -359,9 +362,13 @@ bool flux_sigcert_equal (struct flux_sigcert *cert1, struct flux_sigcert *cert2)
     if (memcmp (cert1->public_key, cert2->public_key,
                                    crypto_sign_PUBLICKEYBYTES) != 0)
         return false;
-    if (memcmp (cert1->secret_key, cert2->secret_key,
-                                   crypto_sign_SECRETKEYBYTES) != 0)
+    if (cert1->secret_valid != cert2->secret_valid)
         return false;
+    if (cert1->secret_valid) {
+        if (memcmp (cert1->secret_key, cert2->secret_key,
+                                       crypto_sign_SECRETKEYBYTES) != 0)
+            return false;
+    }
     return true;
 }
 
@@ -369,7 +376,7 @@ char *flux_sigcert_sign (struct flux_sigcert *cert, uint8_t *buf, int len)
 {
     uint8_t sig[crypto_sign_BYTES];
 
-    if (!cert || len < 0 || (len > 0 && buf == NULL)) {
+    if (!cert || !cert->secret_valid || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return NULL;
     }
