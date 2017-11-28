@@ -59,6 +59,13 @@ char *flux_sigcert_sign (struct flux_sigcert *cert,
 int flux_sigcert_verify (struct flux_sigcert *cert,
                          const char *signature, uint8_t *buf, int len);
 
+
+/* Get/set metadata
+ */
+int flux_sigcert_meta_set (struct flux_sigcert *cert, const char *key,
+                           const char *value);
+const char *flux_sigcert_meta_get (struct flux_sigcert *cert, const char *key);
+
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
  */

@@ -61,6 +61,28 @@ static void cleanup_keypath (const char *name)
     (void)unlink (path);
 }
 
+void test_meta (void)
+{
+    struct flux_sigcert *cert;
+    const char *s;
+
+    cert = flux_sigcert_create ();
+    ok (cert != NULL,
+        "flux_sigcert_create works");
+    ok (flux_sigcert_meta_set (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_set foo=bar");
+    ok (flux_sigcert_meta_set (cert, "baz", "42") == 0,
+        "flux_sigcert_meta_set baz=42");
+    s = flux_sigcert_meta_get (cert, "foo");
+    ok (s != NULL && !strcmp (s, "bar"),
+        "flux_sigcert_meta_get foo works");
+    s = flux_sigcert_meta_get (cert, "baz");
+    ok (s != NULL && !strcmp (s, "42"),
+        "flux_sigcert_meta_get baz works");
+
+    flux_sigcert_destroy (cert);
+}
+
 void test_load_store (void)
 {
     struct flux_sigcert *cert;
@@ -84,6 +106,8 @@ void test_load_store (void)
      * Load it back into a different cert, and make sure keys are the same.
      */
     name = new_keypath ("test");
+    ok (flux_sigcert_meta_set (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_set foo=bar");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store test, test.pub worked");
     ok ((cert2 = flux_sigcert_load (name)) != NULL,
@@ -257,6 +281,10 @@ void test_json_load_dump (void)
     name = new_keypath ("test");
     if (!(cert = flux_sigcert_create ()))
         BAIL_OUT ("flux_sigcert_create");
+    ok (flux_sigcert_meta_set (cert, "foo", "42") == 0,
+        "flux_sigcert_meta_set foo=42");
+    ok (flux_sigcert_meta_set (cert, "bar", "3.14") == 0,
+        "flux_sigcert_meta_set bar=3.14");
     if (flux_sigcert_store (cert, name) < 0)
         BAIL_OUT ("flux_sigcert_store");
     name = new_keypath ("test.pub");
@@ -379,6 +407,7 @@ int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
 
+    test_meta ();
     test_load_store ();
     test_sign_verify();
     test_json_load_dump_sign ();

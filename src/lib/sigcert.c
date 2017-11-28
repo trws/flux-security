@@ -54,6 +54,8 @@ struct flux_sigcert {
     uint8_t public_key[crypto_sign_PUBLICKEYBYTES];
     uint8_t secret_key[crypto_sign_SECRETKEYBYTES];
 
+    json_t *meta;
+
     bool sodium_initialized;
     bool secret_valid;
 };
@@ -63,6 +65,7 @@ void flux_sigcert_destroy (struct flux_sigcert *cert)
     if (cert) {
         int saved_errno = errno;
         assert (cert->magic == FLUX_SIGCERT_MAGIC);
+        json_decref (cert->meta);
         memset (cert->public_key, 0, crypto_sign_PUBLICKEYBYTES);
         memset (cert->secret_key, 0, crypto_sign_SECRETKEYBYTES);
         cert->magic = ~FLUX_SIGCERT_MAGIC;
@@ -71,13 +74,29 @@ void flux_sigcert_destroy (struct flux_sigcert *cert)
     }
 }
 
-struct flux_sigcert *flux_sigcert_create (void)
+struct flux_sigcert *sigcert_create (void)
 {
     struct flux_sigcert *cert;
 
     if (!(cert = calloc (1, sizeof (*cert))))
         return NULL;
     cert->magic = FLUX_SIGCERT_MAGIC;
+    if (!(cert->meta = json_object ())) {
+        errno = ENOMEM;
+        goto error;
+    }
+    return cert;
+error:
+    flux_sigcert_destroy (cert);
+    return NULL;
+}
+
+struct flux_sigcert *flux_sigcert_create (void)
+{
+    struct flux_sigcert *cert;
+
+    if (!(cert = sigcert_create ()))
+        goto error;
     if (sodium_init () < 0) {
         errno = EINVAL;
         goto error;
@@ -90,6 +109,35 @@ struct flux_sigcert *flux_sigcert_create (void)
 error:
     flux_sigcert_destroy (cert);
     return NULL;
+}
+
+int flux_sigcert_meta_set (struct flux_sigcert *cert,
+                           const char *key, const char *s)
+{
+    json_t *val;
+    if (!(val = json_string (s)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+const char *flux_sigcert_meta_get (struct flux_sigcert *cert, const char *key)
+{
+    json_t *val;
+    const char *s;
+
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return NULL;
+    }
+    if (!(s = json_string_value (val)))
+        errno = EINVAL;
+    return s;
 }
 
 /* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
@@ -161,7 +209,29 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
 static int sigcert_fwrite (struct flux_sigcert *cert, FILE *fp, bool secret)
 {
     char *key = NULL;
+    void *iter;
 
+    // [metadata]
+    if (fprintf (fp, "[metadata]\n") < 0)
+        goto error;
+    iter = json_object_iter (cert->meta);
+    while (iter) {
+        const char *mkey = json_object_iter_key (iter);
+        json_t *val = json_object_iter_value (iter);
+        const char *s;
+
+        if (!mkey || !val || !(s = json_string_value (val))) {
+            errno = EINVAL;
+            goto error;
+        }
+        if (fprintf (fp, "    %s = \"%s\"\n", mkey, s) < 0)
+            goto error;
+        iter = json_object_iter_next (cert->meta, iter);
+    }
+    if (fprintf (fp, "\n") < 0)
+        goto error;
+
+    // [curve]
     if (fprintf (fp, "[curve]\n") < 0)
         goto error;
     if (!(key = sigcert_base64_encode (cert->public_key,
@@ -249,6 +319,22 @@ done:
     return rc;
 }
 
+static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
+                                const char *key)
+{
+    char *s = NULL;
+    int rc = -1;
+
+    if (toml_rtos (raw, &s) < 0)
+        goto done;
+    if (flux_sigcert_meta_set (cert, key, s) < 0)
+        goto done;
+    rc = 0;
+done:
+    free (s);
+    return rc;
+}
+
 /* Read cert contents from 'fp' in TOML format.
  * If secret=true, include secret key.
  */
@@ -256,11 +342,24 @@ static int sigcert_fread (struct flux_sigcert *cert, FILE *fp, bool secret)
 {
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
+    toml_table_t *meta_table;
+    const char *key;
     const char *raw;
+    int i;
     char errbuf[200];
 
     if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
         goto inval;
+
+    // [metadata]
+    if (!(meta_table = toml_table_in (cert_table, "metadata")))
+        goto inval;
+    for (i = 0; (key = toml_key_in (meta_table, i)); i++) {
+        if (!(raw = toml_raw_in (meta_table, key)))
+            goto inval;
+        if (parse_toml_meta_set (raw, cert, key) < 0)
+            goto inval;
+    }
 
     // [curve]
     if (!(curve_table = toml_table_in (cert_table, "curve")))
@@ -296,9 +395,8 @@ struct flux_sigcert *flux_sigcert_load (const char *name)
         goto inval;
     if (snprintf (name_pub, pubsz, "%s.pub", name) >= pubsz)
         goto inval;
-    if (!(cert = calloc (1, sizeof (*cert))))
+    if (!(cert = sigcert_create ()))
         return NULL;
-    cert->magic = FLUX_SIGCERT_MAGIC;
 
     /* Try the secret cert file first.
      * If that doesn't work, try the public cert file.
@@ -341,7 +439,10 @@ char *flux_sigcert_json_dumps (struct flux_sigcert *cert)
     if (!(xpub = sigcert_base64_encode (cert->public_key,
                                                 crypto_sign_PUBLICKEYBYTES)))
         goto error;
-    if (!(obj = json_pack ("{s:{s:s}}", "curve", "public-key", xpub))) {
+    if (!(obj = json_pack ("{s:O,s:{s:s}}",
+                           "metadata", cert->meta,
+                           "curve",
+                             "public-key", xpub))) {
         errno = ENOMEM;
         goto error;
     }
@@ -371,14 +472,19 @@ struct flux_sigcert *flux_sigcert_json_loads (const char *s)
         errno = EINVAL;
         return NULL;
     }
-    if (!(cert = calloc (1, sizeof (*cert))))
+    if (!(cert = sigcert_create ()))
         return NULL;
-    cert->magic = FLUX_SIGCERT_MAGIC;
+    json_decref (cert->meta); // we create cert->meta from scratch below
+    cert->meta = NULL;
+
     if (!(obj = json_loads (s, 0, NULL))) {
         errno = EPROTO;
         goto error;
     }
-    if (json_unpack (obj, "{s{s:s}}", "curve", "public-key", &xpub) < 0) {
+    if (json_unpack (obj, "{s:O,s:{s:s}}",
+                     "metadata", &cert->meta,
+                     "curve",
+                       "public-key", &xpub) < 0) {
         errno = EPROTO;
         goto error;
     }
@@ -398,6 +504,8 @@ error:
 bool flux_sigcert_equal (struct flux_sigcert *cert1, struct flux_sigcert *cert2)
 {
     if (!cert1 || !cert2)
+        return false;
+    if (!json_equal (cert1->meta, cert2->meta))
         return false;
     if (memcmp (cert1->public_key, cert2->public_key,
                                    crypto_sign_PUBLICKEYBYTES) != 0)
