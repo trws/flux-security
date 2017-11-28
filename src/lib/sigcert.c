@@ -219,17 +219,82 @@ error:
     return -1;
 }
 
-struct flux_sigcert *flux_sigcert_load (const char *name)
+static int parse_toml_public_key (const char *raw, uint8_t *key)
 {
-    FILE *fp = NULL;
+    char *s = NULL;
+    int rc = -1;
+
+    if (toml_rtos (raw, &s) < 0)
+        goto done;
+    if (sigcert_base64_decode (s, key, crypto_sign_PUBLICKEYBYTES) < 0)
+        goto done;
+    rc = 0;
+done:
+    free (s);
+    return rc;
+}
+
+static int parse_toml_secret_key (const char *raw, uint8_t *key)
+{
+    char *s = NULL;
+    int rc = -1;
+
+    if (toml_rtos (raw, &s) < 0)
+        goto done;
+    if (sigcert_base64_decode (s, key, crypto_sign_SECRETKEYBYTES) < 0)
+        goto done;
+    rc = 0;
+done:
+    free (s);
+    return rc;
+}
+
+/* Read cert contents from 'fp' in TOML format.
+ * If secret=true, include secret key.
+ */
+static int sigcert_fread (struct flux_sigcert *cert, FILE *fp, bool secret)
+{
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
     const char *raw;
-    int saved_errno;
     char errbuf[200];
+
+    if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
+        goto inval;
+
+    // [curve]
+    if (!(curve_table = toml_table_in (cert_table, "curve")))
+        goto inval;
+    if (!(raw = toml_raw_in (curve_table, "public-key")))
+        goto inval;
+    if (parse_toml_public_key (raw, cert->public_key) < 0)
+        goto inval;
+    if (secret) {
+        if ((raw = toml_raw_in (curve_table, "secret-key"))) { // optional
+            if (parse_toml_secret_key (raw, cert->secret_key) < 0)
+                goto inval;
+            cert->secret_valid = true;
+        }
+    }
+    toml_free (cert_table);
+    return 0;
+inval:
+    toml_free (cert_table);
+    errno = EINVAL;
+    return -1;
+}
+
+struct flux_sigcert *flux_sigcert_load (const char *name)
+{
+    FILE *fp = NULL;
+    const int pubsz = PATH_MAX + 1;
+    char name_pub[pubsz];
+    int saved_errno;
     struct flux_sigcert *cert = NULL;
 
     if (!name)
+        goto inval;
+    if (snprintf (name_pub, pubsz, "%s.pub", name) >= pubsz)
         goto inval;
     if (!(cert = calloc (1, sizeof (*cert))))
         return NULL;
@@ -238,54 +303,25 @@ struct flux_sigcert *flux_sigcert_load (const char *name)
     /* Try the secret cert file first.
      * If that doesn't work, try the public cert file.
      */
-    if (!(fp = fopen (name, "r"))) {
-        const int pubsz = PATH_MAX + 1;
-        char name_pub[pubsz];
-        if (snprintf (name_pub, pubsz, "%s.pub", name) >= pubsz)
-            goto inval;
-        if (!(fp = fopen (name_pub, "r")))
+    if ((fp = fopen (name, "r"))) {
+        if (sigcert_fread (cert, fp, true) < 0)
             goto error;
     }
-
-    if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
-        goto inval;
-    if (!(curve_table = toml_table_in (cert_table, "curve")))
-        goto inval;
-    if ((raw = toml_raw_in (curve_table, "secret-key"))) { // optional
-        char *s;
-        if (toml_rtos (raw, &s) < 0)
-            goto inval;
-        if (sigcert_base64_decode (s, cert->secret_key,
-                                   crypto_sign_SECRETKEYBYTES) < 0) {
-            free (s);
-            goto inval;
-        }
-        free (s);
-        cert->secret_valid = true;
+    else if ((fp = fopen (name_pub, "r"))) {
+        if (sigcert_fread (cert, fp, false) < 0)
+            goto error;
     }
-    if ((raw = toml_raw_in (curve_table, "public-key"))) { // required
-        char *s;
-        if (toml_rtos (raw, &s) < 0)
-            goto inval;
-        if (sigcert_base64_decode (s, cert->public_key,
-                                   crypto_sign_PUBLICKEYBYTES) < 0) {
-            free (s);
-            goto inval;
-        }
-        free (s);
-    } else
-        goto inval;
-
-    toml_free (cert_table);
-    fclose (fp);
+    else
+        goto error;
+    if (fclose (fp) < 0)
+        goto error;
     return cert;
 inval:
     errno = EINVAL;
 error:
     saved_errno = errno;
-    toml_free (cert_table);
     if (fp)
-        fclose (fp);
+        (void)fclose (fp);
     flux_sigcert_destroy (cert);
     errno = saved_errno;
     return NULL;
