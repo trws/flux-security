@@ -155,12 +155,38 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
     return fp;
 }
 
+/* Write cert contents to 'fp' in TOML format.
+ * If secret=true, include secret key.
+ */
+static int sigcert_fwrite (struct flux_sigcert *cert, FILE *fp, bool secret)
+{
+    char *key = NULL;
+
+    if (fprintf (fp, "[curve]\n") < 0)
+        goto error;
+    if (!(key = sigcert_base64_encode (cert->public_key,
+                                       crypto_sign_PUBLICKEYBYTES)))
+        goto error;
+    if (fprintf (fp, "    public-key = \"%s\"\n", key) < 0)
+        goto error;
+    free (key);
+    if (secret) {
+        if (!(key = sigcert_base64_encode (cert->secret_key,
+                                           crypto_sign_SECRETKEYBYTES)))
+            goto error;
+        if (fprintf (fp, "    secret-key = \"%s\"\n", key) < 0)
+            goto error;
+        free (key);
+    }
+    return 0;
+error:
+    free (key);
+    return -1;
+}
+
 int flux_sigcert_store (struct flux_sigcert *cert, const char *name)
 {
-    FILE *fp_sec = NULL;
-    FILE *fp_pub = NULL;
-    char *xsec = NULL;
-    char *xpub = NULL;
+    FILE *fp = NULL;
     const int pubsz = PATH_MAX + 1;
     char name_pub[pubsz];
     int saved_errno;
@@ -169,48 +195,26 @@ int flux_sigcert_store (struct flux_sigcert *cert, const char *name)
         errno = EINVAL;
         goto error;
     }
-    if (!(xsec = sigcert_base64_encode (cert->secret_key,
-                                                crypto_sign_SECRETKEYBYTES)))
-        goto error;
-    if (!(xpub = sigcert_base64_encode (cert->public_key,
-                                                crypto_sign_PUBLICKEYBYTES)))
-        goto error;
-
-    if (!(fp_sec = fopen_mode (name, 0600)))
-        goto error;
-    if (fprintf (fp_sec, "[curve]\n") < 0)
-        goto error;
-    if (fprintf (fp_sec, "    secret-key = \"%s\"\n", xsec) < 0)
-        goto error;
-    if (fprintf (fp_sec, "    public-key = \"%s\"\n", xpub) < 0)
-        goto error;
-    if (fclose (fp_sec) < 0)
-        goto error;
-    fp_sec = NULL;
-
     if (snprintf (name_pub, pubsz, "%s.pub", name) >= pubsz)
         goto error;
-    if (!(fp_pub = fopen_mode (name_pub, 0644)))
+    if (!(fp = fopen_mode (name_pub, 0644)))
         goto error;
-    if (fprintf (fp_pub, "[curve]\n") < 0)
+    if (sigcert_fwrite (cert, fp, false) < 0)
         goto error;
-    if (fprintf (fp_pub, "    public-key = \"%s\"\n", xpub) < 0)
+    if (fclose (fp) < 0)
         goto error;
-    if (fclose (fp_pub) < 0)
-        goto error;
-    fp_pub = NULL;
 
-    free (xsec);
-    free (xpub);
+    if (!(fp = fopen_mode (name, 0600)))
+        goto error;
+    if (sigcert_fwrite (cert, fp, true) < 0)
+        goto error;
+    if (fclose (fp) < 0)
+        goto error;
     return 0;
 error:
     saved_errno = errno;
-    free (xsec);
-    free (xpub);
-    if (fp_pub)
-        (void)fclose (fp_pub);
-    if (fp_sec)
-        (void)fclose (fp_sec);
+    if (fp)
+        (void)fclose (fp);
     errno = saved_errno;
     return -1;
 }
