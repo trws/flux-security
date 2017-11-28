@@ -207,7 +207,7 @@ void test_sign_verify (void)
     flux_sigcert_destroy (cert2);
 }
 
-void test_json_load_dump (void)
+void test_json_load_dump_sign (void)
 {
     struct flux_sigcert *cert;
     struct flux_sigcert *cert_pub;
@@ -238,6 +238,54 @@ void test_json_load_dump (void)
     free (s);
     flux_sigcert_destroy (cert);
     flux_sigcert_destroy (cert_pub);
+}
+
+void test_json_load_dump (void)
+{
+    struct flux_sigcert *cert;
+    struct flux_sigcert *cert_pub;
+    struct flux_sigcert *cert2;
+    char *s;
+    const char *name;
+
+    new_scratchdir ();
+
+    /* Store a cert to test, test.pub, then load cert_pub from
+     * test.pub so we have one containing only the public key.
+     * (json codec never transfers the secret key)
+     */
+    name = new_keypath ("test");
+    if (!(cert = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create");
+    if (flux_sigcert_store (cert, name) < 0)
+        BAIL_OUT ("flux_sigcert_store");
+    name = new_keypath ("test.pub");
+    ok ((cert_pub = flux_sigcert_load (name)) != NULL,
+        "flux_sigcert_load test.pub worked");
+
+    /* Dump cert_pub to json string, then load cert2 from
+     * json_string, and test cert_pub and cert2 for equality.
+     * Everything was properly marshaled.
+     */
+    s = flux_sigcert_json_dumps (cert_pub);
+    ok (s != NULL,
+        "flux_sigcert_json_dumps works");
+    cert2 = flux_sigcert_json_loads (s);
+    ok (cert2 != NULL,
+        "flux_sigcert_json_loads works");
+    ok (flux_sigcert_equal (cert2, cert_pub) == true,
+        "the two certs are equal");
+    diag ("%s", s);
+
+    free (s);
+    flux_sigcert_destroy (cert);
+    flux_sigcert_destroy (cert_pub);
+    flux_sigcert_destroy (cert2);
+
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+
+    cleanup_scratchdir ();
 }
 
 void test_corner (void)
@@ -333,6 +381,7 @@ int main (int argc, char *argv[])
 
     test_load_store ();
     test_sign_verify();
+    test_json_load_dump_sign ();
     test_json_load_dump ();
 
     test_corner ();
