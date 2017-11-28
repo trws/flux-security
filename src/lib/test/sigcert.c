@@ -61,13 +61,33 @@ static void cleanup_keypath (const char *name)
     (void)unlink (path);
 }
 
+void test_meta (void)
+{
+    struct flux_sigcert *cert;
+    const char *s;
+
+    cert = flux_sigcert_create ();
+    ok (cert != NULL,
+        "flux_sigcert_create works");
+    ok (flux_sigcert_meta_set (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_set foo=bar");
+    ok (flux_sigcert_meta_set (cert, "baz", "42") == 0,
+        "flux_sigcert_meta_set baz=42");
+    s = flux_sigcert_meta_get (cert, "foo");
+    ok (s != NULL && !strcmp (s, "bar"),
+        "flux_sigcert_meta_get foo works");
+    s = flux_sigcert_meta_get (cert, "baz");
+    ok (s != NULL && !strcmp (s, "42"),
+        "flux_sigcert_meta_get baz works");
+
+    flux_sigcert_destroy (cert);
+}
+
 void test_load_store (void)
 {
     struct flux_sigcert *cert;
     struct flux_sigcert *cert2;
     const char *name;
-
-    plan (NO_PLAN);
 
     new_scratchdir ();
 
@@ -86,6 +106,8 @@ void test_load_store (void)
      * Load it back into a different cert, and make sure keys are the same.
      */
     name = new_keypath ("test");
+    ok (flux_sigcert_meta_set (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_set foo=bar");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store test, test.pub worked");
     ok ((cert2 = flux_sigcert_load (name)) != NULL,
@@ -209,7 +231,7 @@ void test_sign_verify (void)
     flux_sigcert_destroy (cert2);
 }
 
-void test_json_load_dump (void)
+void test_json_load_dump_sign (void)
 {
     struct flux_sigcert *cert;
     struct flux_sigcert *cert_pub;
@@ -240,6 +262,58 @@ void test_json_load_dump (void)
     free (s);
     flux_sigcert_destroy (cert);
     flux_sigcert_destroy (cert_pub);
+}
+
+void test_json_load_dump (void)
+{
+    struct flux_sigcert *cert;
+    struct flux_sigcert *cert_pub;
+    struct flux_sigcert *cert2;
+    char *s;
+    const char *name;
+
+    new_scratchdir ();
+
+    /* Store a cert to test, test.pub, then load cert_pub from
+     * test.pub so we have one containing only the public key.
+     * (json codec never transfers the secret key)
+     */
+    name = new_keypath ("test");
+    if (!(cert = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create");
+    ok (flux_sigcert_meta_set (cert, "foo", "42") == 0,
+        "flux_sigcert_meta_set foo=42");
+    ok (flux_sigcert_meta_set (cert, "bar", "3.14") == 0,
+        "flux_sigcert_meta_set bar=3.14");
+    if (flux_sigcert_store (cert, name) < 0)
+        BAIL_OUT ("flux_sigcert_store");
+    name = new_keypath ("test.pub");
+    ok ((cert_pub = flux_sigcert_load (name)) != NULL,
+        "flux_sigcert_load test.pub worked");
+
+    /* Dump cert_pub to json string, then load cert2 from
+     * json_string, and test cert_pub and cert2 for equality.
+     * Everything was properly marshaled.
+     */
+    s = flux_sigcert_json_dumps (cert_pub);
+    ok (s != NULL,
+        "flux_sigcert_json_dumps works");
+    cert2 = flux_sigcert_json_loads (s);
+    ok (cert2 != NULL,
+        "flux_sigcert_json_loads works");
+    ok (flux_sigcert_equal (cert2, cert_pub) == true,
+        "the two certs are equal");
+    diag ("%s", s);
+
+    free (s);
+    flux_sigcert_destroy (cert);
+    flux_sigcert_destroy (cert_pub);
+    flux_sigcert_destroy (cert2);
+
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+
+    cleanup_scratchdir ();
 }
 
 void test_corner (void)
@@ -333,8 +407,10 @@ int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
 
+    test_meta ();
     test_load_store ();
     test_sign_verify();
+    test_json_load_dump_sign ();
     test_json_load_dump ();
 
     test_corner ();
