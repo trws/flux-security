@@ -67,8 +67,6 @@ void test_load_store (void)
     struct flux_sigcert *cert2;
     const char *name;
 
-    plan (NO_PLAN);
-
     new_scratchdir ();
 
     /* Create a certificate.
