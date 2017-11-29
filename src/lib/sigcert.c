@@ -132,7 +132,7 @@ nomem:
     return -1;
 }
 
-const char *flux_sigcert_meta_get (struct flux_sigcert *cert, const char *key)
+const char *flux_sigcert_meta_get (const struct flux_sigcert *cert, const char *key)
 {
     json_t *val;
     const char *s;
@@ -212,7 +212,8 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
 /* Write cert contents to 'fp' in TOML format.
  * If secret=true, include secret key.
  */
-static int sigcert_fwrite (struct flux_sigcert *cert, FILE *fp, bool secret)
+static int sigcert_fwrite (const struct flux_sigcert *cert,
+                           FILE *fp, bool secret)
 {
     char *key = NULL;
     void *iter;
@@ -260,7 +261,7 @@ error:
     return -1;
 }
 
-int flux_sigcert_store (struct flux_sigcert *cert, const char *name)
+int flux_sigcert_store (const struct flux_sigcert *cert, const char *name)
 {
     FILE *fp = NULL;
     const int pubsz = PATH_MAX + 1;
@@ -431,7 +432,7 @@ error:
     return NULL;
 }
 
-char *flux_sigcert_json_dumps (struct flux_sigcert *cert)
+char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
 {
     json_t *obj = NULL;
     char *xpub = NULL;
@@ -507,7 +508,8 @@ error:
     return NULL;
 }
 
-bool flux_sigcert_equal (struct flux_sigcert *cert1, struct flux_sigcert *cert2)
+bool flux_sigcert_equal (const struct flux_sigcert *cert1,
+                         const struct flux_sigcert *cert2)
 {
     if (!cert1 || !cert2)
         return false;
@@ -526,7 +528,8 @@ bool flux_sigcert_equal (struct flux_sigcert *cert1, struct flux_sigcert *cert2)
     return true;
 }
 
-char *flux_sigcert_sign (struct flux_sigcert *cert, uint8_t *buf, int len)
+char *flux_sigcert_sign (const struct flux_sigcert *cert,
+                         uint8_t *buf, int len)
 {
     uint8_t sig[crypto_sign_BYTES];
 
@@ -541,7 +544,7 @@ char *flux_sigcert_sign (struct flux_sigcert *cert, uint8_t *buf, int len)
     return sigcert_base64_encode (sig, crypto_sign_BYTES);
 }
 
-int flux_sigcert_verify (struct flux_sigcert *cert,
+int flux_sigcert_verify (const struct flux_sigcert *cert,
                          const char *sig_base64, uint8_t *buf, int len)
 {
     uint8_t sig[crypto_sign_BYTES];
