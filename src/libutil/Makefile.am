@@ -14,7 +14,10 @@ noinst_LTLIBRARIES = \
 
 libutil_la_SOURCES = \
 	base64.c \
-	base64.h
+	base64.h \
+	thread.h \
+	hash.c \
+	hash.h
 
 TESTS = test_base64.t
 
