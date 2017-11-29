@@ -286,6 +286,85 @@ int flux_sigcert_meta_getb (const struct flux_sigcert *cert,
     return 0;
 }
 
+/* Convert time_t (GMT) to ISO 8601 timestamp, e.g. 2003-08-24T05:14:50Z
+ */
+static int timetostr (time_t t, char *buf, int size)
+{
+    struct tm tm;
+    if (!gmtime_r (&t, &tm))
+        return -1;
+    if (strftime (buf, size, "%FT%TZ", &tm) == 0)
+        return -1;
+    return 0;
+}
+
+static int strtotime (const char *s, time_t *tp)
+{
+    struct tm tm;
+    time_t t;
+    if (!strptime (s, "%FT%TZ", &tm))
+        return -1;
+    if ((t = timegm (&tm)) < 0)
+        return -1;
+    *tp = t;
+    return 0;
+}
+
+/* Timestamp is the only TOML type that doesn't have a corresponding
+ * JSON type.  Represent it as a JSON object that looks like this:
+ *   { "iso-8601-ts" : "2003-08-24T05:14:50Z" }
+ * Since this is the only metadata represented as an object, and
+ * metadata is strictly a flat list, this cannot be confused with any
+ * of the other metadata types.
+ */
+int flux_sigcert_meta_setts (struct flux_sigcert *cert,
+                             const char *key, time_t t)
+{
+    json_t *val;
+    char timebuf[80];
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (timetostr (t, timebuf, sizeof (timebuf)) < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_pack ("{s:s}", "iso-8601-ts", timebuf)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_getts (const struct flux_sigcert *cert,
+                             const char *key, time_t *tp)
+{
+    json_t *val;
+    const char *s;
+    time_t t;
+
+    if (!cert || !key || strchr (key, '.') || !tp) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (json_unpack (val, "{s:s}", "iso-8601-ts", &s) < 0
+                                    || strtotime (s, &t) < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    *tp = t;
+    return 0;
+}
 
 /* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
  * a base64 string encoding of it.  Caller must free.
@@ -394,6 +473,13 @@ static int sigcert_fwrite (const struct flux_sigcert *cert,
                          mkey, json_real_value (val)) < 0)
                 goto error;
         }
+        else if (json_is_object (val)) {
+            const char *s;
+            if (json_unpack (val, "{s:s}", "iso-8601-ts", &s) < 0)
+                goto error;
+            if (fprintf (fp, "    %s = %s\n", mkey, s) < 0)
+                goto error;
+        }
         else {
             errno = EINVAL;
             goto error;
@@ -499,6 +585,7 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
     int64_t i;
     double d;
     int b;
+    toml_timestamp_t ts;
 
     if (toml_rtos (raw, &s) == 0) {
         if (flux_sigcert_meta_sets (cert, key, s) < 0)
@@ -514,6 +601,25 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
     }
     else if (toml_rtod (raw, &d) == 0) {
         if (flux_sigcert_meta_setd (cert, key, d) < 0)
+            goto done;
+    }
+    else if (toml_rtots (raw, &ts) == 0) {
+        struct tm tm;
+        time_t t;
+        if (!ts.year || !ts.month || !ts.day)
+            goto done;
+        if (!ts.hour || !ts.minute || !ts.second)
+            goto done;
+        memset (&tm, 0, sizeof (tm));
+        tm.tm_year = *ts.year - 1900;
+        tm.tm_mon = *ts.month - 1;
+        tm.tm_mday = *ts.day;
+        tm.tm_hour = *ts.hour;
+        tm.tm_min = *ts.minute;
+        tm.tm_sec = *ts.second;
+        if ((t = timegm (&tm)) < 0)
+            goto done;
+        if (flux_sigcert_meta_setts (cert, key, t) < 0)
             goto done;
     }
     else

@@ -1,6 +1,7 @@
 #ifndef _FLUX_SIGCERT_H
 #define _FLUX_SIGCERT_H
 
+#include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -78,6 +79,10 @@ int flux_sigcert_meta_setb (struct flux_sigcert *cert,
                             const char *key, bool value);
 int flux_sigcert_meta_getb (const struct flux_sigcert *cert,
                             const char *key, bool *value);
+int flux_sigcert_meta_setts (struct flux_sigcert *cert,
+                             const char *key, time_t value);
+int flux_sigcert_meta_getts (const struct flux_sigcert *cert,
+                             const char *key, time_t *value);
 
 #ifdef __cplusplus
 }
