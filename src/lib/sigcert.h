@@ -60,6 +60,19 @@ char *flux_sigcert_sign (const struct flux_sigcert *cert,
 int flux_sigcert_verify (const struct flux_sigcert *cert,
                          const char *signature, uint8_t *buf, int len);
 
+/* Use cert1 to sign cert2.
+ * The signature covers public key and all metadata.
+ * It does not cover secret key or existing signature, if any.
+ * The signature is embedded in cert2.
+ */
+int flux_sigcert_sign_cert (const struct flux_sigcert *cert1,
+                            struct flux_sigcert *cert2);
+
+/* Use cert1 to verify cert2's embedded signature.
+ */
+int flux_sigcert_verify_cert (const struct flux_sigcert *cert1,
+                              const struct flux_sigcert *cert2);
+
 
 /* Get/set metadata
  */

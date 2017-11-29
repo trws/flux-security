@@ -652,6 +652,43 @@ void test_corner (void)
     flux_sigcert_destroy (cert);
 }
 
+void test_sign_cert (void)
+{
+    struct flux_sigcert *cert;
+    struct flux_sigcert *ca;
+
+    if (!(cert = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create: %s", strerror (errno));
+    if (flux_sigcert_meta_sets (cert, "username", "itsme") < 0)
+        BAIL_OUT ("meta_sets failed");
+    if (!(ca = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create: %s", strerror (errno));
+
+    /* Verification of an unsigned cert fails.
+     */
+    errno = 0;
+    ok (flux_sigcert_verify_cert (ca, cert) < 0 && errno == EINVAL,
+        "flux_sigcert_verify_cert fails with EINVAL");
+
+    /* CA signs and verifies cert.
+     */
+    ok (flux_sigcert_sign_cert (ca, cert) == 0,
+        "flux_sigcert_sign_cert works");
+    ok (flux_sigcert_verify_cert (ca, cert) == 0,
+        "flux_sigcert_verify_cert works");
+
+    /* Verification of a signed but modified cert fails.
+     */
+    ok (flux_sigcert_meta_sets (cert, "username", "noitsme") == 0,
+        "flux_sigcert_meta_sets changes signed cert");
+    errno = 0;
+    ok (flux_sigcert_verify_cert (ca, cert) < 0 && errno == EINVAL,
+        "flux_sigcert_verify_cert fails with EINVAL");
+
+    flux_sigcert_destroy (cert);
+    flux_sigcert_destroy (ca);
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -663,6 +700,8 @@ int main (int argc, char *argv[])
     test_json_load_dump ();
 
     test_corner ();
+
+    test_sign_cert ();
 
     done_testing ();
 }

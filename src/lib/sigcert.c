@@ -70,10 +70,12 @@ struct flux_sigcert {
 
     public_t public_key;
     secret_t secret_key;
+    sign_t signature;
 
     json_t *meta;
 
     bool secret_valid;
+    bool signature_valid;
 };
 
 void flux_sigcert_destroy (struct flux_sigcert *cert)
@@ -84,6 +86,7 @@ void flux_sigcert_destroy (struct flux_sigcert *cert)
         json_decref (cert->meta);
         memset (cert->public_key, 0, crypto_sign_PUBLICKEYBYTES);
         memset (cert->secret_key, 0, crypto_sign_SECRETKEYBYTES);
+        memset (cert->signature, 0, crypto_sign_BYTES);
         cert->magic = ~FLUX_SIGCERT_MAGIC;
         free (cert);
         errno = saved_errno;
@@ -565,6 +568,12 @@ static int sigcert_fwrite (const struct flux_sigcert *cert,
         if (fprintf (fp, "    secret-key = \"%s\"\n", seckey) < 0)
             goto error;
     }
+    if (cert->signature_valid) {
+        sign_base64_t sign;
+        sigcert_base64_encode_sign (cert->signature, sign);
+        if (fprintf (fp, "    signature = \"%s\"\n", sign) < 0)
+            goto error;
+    }
     return 0;
 error:
     return -1;
@@ -628,6 +637,21 @@ static int parse_toml_secret_key (const char *raw, secret_t key)
     if (toml_rtos (raw, &s) < 0)
         goto done;
     if (sigcert_base64_decode_secret (s, key) < 0)
+        goto done;
+    rc = 0;
+done:
+    free (s);
+    return rc;
+}
+
+static int parse_toml_signature (const char *raw, sign_t sig)
+{
+    char *s = NULL;
+    int rc = -1;
+
+    if (toml_rtos (raw, &s) < 0)
+        goto done;
+    if (sigcert_base64_decode_sign (s, sig) < 0)
         goto done;
     rc = 0;
 done:
@@ -728,6 +752,11 @@ static int sigcert_fread (struct flux_sigcert *cert, FILE *fp, bool secret)
             cert->secret_valid = true;
         }
     }
+    if ((raw = toml_raw_in (curve_table, "signature"))) { // optional
+        if (parse_toml_signature (raw, cert->signature) < 0)
+            goto inval;
+        cert->signature_valid = true;
+    }
     toml_free (cert_table);
     return 0;
 inval:
@@ -778,7 +807,37 @@ error:
     return NULL;
 }
 
-char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
+/* Encode 'sign' as base64 and add signature = sign_base64 to 'obj'.
+ */
+static int sigcert_pack_signature (const sign_t sign, json_t *obj)
+{
+    sign_base64_t sign_base64;
+    json_t *sigobj;
+
+    if (!obj) {
+        errno = EINVAL;
+        return -1;
+    }
+    sigcert_base64_encode_sign (sign, sign_base64);
+    sigobj = json_string (sign_base64);
+    if (!sigobj || json_object_set_new (obj, "signature", sigobj) < 0) {
+        json_decref (sigobj);
+        errno = ENOMEM;
+        return -1;
+    }
+    return 0;
+}
+
+/* This is used to serialize the cert for signing.
+ * The secret key is always exluded.
+ * The signature is included if signature=true and it's valid.
+ * IMPORTANT:  This serialization is used for generating a signature over
+ * the cert itself.  It's not exposed outside of this module for that purpose,
+ * but changing it could make certs that were signed before the change fail
+ * verification!
+ */
+static char *sigcert_json_dumps (const struct flux_sigcert *cert,
+                                 bool signature)
 {
     json_t *obj = NULL;
     public_base64_t pubkey;
@@ -797,7 +856,12 @@ char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
         errno = ENOMEM;
         goto error;
     }
-    if (!(s = json_dumps (obj, JSON_COMPACT))) {
+    if (signature && cert->signature_valid) {
+        if (sigcert_pack_signature (cert->signature,
+                                    json_object_get (obj, "curve")) < 0)
+            goto error;
+    }
+    if (!(s = json_dumps (obj, JSON_COMPACT|JSON_SORT_KEYS))) {
         errno = ENOMEM;
         goto error;
     }
@@ -810,9 +874,15 @@ error:
     return NULL;
 }
 
+char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
+{
+    return sigcert_json_dumps (cert, true);
+}
+
 struct flux_sigcert *flux_sigcert_json_loads (const char *s)
 {
     json_t *obj = NULL;
+    json_t *curve, *sig;
     struct flux_sigcert *cert = NULL;
     const char *pub;
     int saved_errno;
@@ -840,6 +910,18 @@ struct flux_sigcert *flux_sigcert_json_loads (const char *s)
     if (sigcert_base64_decode_public (pub, cert->public_key) < 0) {
         errno = EPROTO;
         goto error;
+    }
+    if (!(curve = json_object_get (obj, "curve"))) {
+        errno = EINVAL;
+        goto error;
+    }
+    if ((sig = json_object_get (curve, "signature"))) {
+        if (sigcert_base64_decode_sign (json_string_value (sig),
+                                        cert->signature) < 0) {
+            errno = EPROTO;
+            goto error;
+        }
+        cert->signature_valid = true;
     }
     json_decref (obj);
     return cert;
@@ -901,6 +983,57 @@ int flux_sigcert_verify (const struct flux_sigcert *cert,
     if (sigcert_base64_decode_sign (sig_base64, sig) < 0)
         return -1;
     if (crypto_sign_verify_detached (sig, buf, len, cert->public_key) < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    return 0;
+}
+
+/* cert1 signs cert2.
+ * Dump cert2 as JSON in a repeatable way, excluding secret + signature,
+ * sign with cert1.  Add 'signature' attribute to [curve] stanza.
+ */
+int flux_sigcert_sign_cert (const struct flux_sigcert *cert1,
+                            struct flux_sigcert *cert2)
+{
+    char *s;
+    int rc;
+
+    if (!cert1 || !cert2 || !cert1->secret_valid) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(s = sigcert_json_dumps (cert2, false)))
+        return -1;
+    rc = crypto_sign_detached (cert2->signature, NULL,
+                               (uint8_t *)s, strlen (s),
+                               cert1->secret_key);
+    free (s);
+    if (rc < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    cert2->signature_valid = true;
+    return 0;
+}
+
+int flux_sigcert_verify_cert (const struct flux_sigcert *cert1,
+                              const struct flux_sigcert *cert2)
+{
+    char *s;
+    int rc;
+
+    if (!cert1 || !cert2 || !cert2->signature_valid) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(s = sigcert_json_dumps (cert2, false)))
+        return -1;
+    rc = crypto_sign_verify_detached (cert2->signature,
+                                      (uint8_t *)s, strlen (s),
+                                      cert1->public_key);
+    free (s);
+    if (rc < 0) {
         errno = EINVAL;
         return -1;
     }
