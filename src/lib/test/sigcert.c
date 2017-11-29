@@ -74,6 +74,7 @@ void test_meta (void)
     const char *s;
     int64_t i;
     double d;
+    bool b;
 
     cert = flux_sigcert_create ();
     ok (cert != NULL,
@@ -84,6 +85,8 @@ void test_meta (void)
         "flux_sigcert_meta_seti baz=42");
     ok (flux_sigcert_meta_setd (cert, "bar", 3.14159) == 0,
         "flux_sigcert_meta_setd bar=3.14159");
+    ok (flux_sigcert_meta_setb (cert, "booles-a-fool", true) == 0,
+        "flux_sigcert_meta_setd booles-a-fool=true");
     ok (flux_sigcert_meta_gets (cert, "foo", &s) == 0
         && !strcmp (s, "bar"),
         "flux_sigcert_meta_gets foo works");
@@ -92,6 +95,8 @@ void test_meta (void)
         "flux_sigcert_meta_geti baz works");
     ok (flux_sigcert_meta_getd (cert, "bar", &d) == 0 && d == 3.14159,
         "flux_sigcert_meta_getd bar works");
+    ok (flux_sigcert_meta_getb (cert, "booles-a-fool", &b) == 0 && b == true,
+        "flux_sigcert_meta_getb booles-a-fool works");
 
     flux_sigcert_destroy (cert);
 }
@@ -125,6 +130,8 @@ void test_load_store (void)
         "flux_sigcert_meta_seti bar=-55");
     ok (flux_sigcert_meta_setd (cert, "baz", 2.718) == 0,
         "flux_sigcert_meta_setd baz=2.718");
+    ok (flux_sigcert_meta_setb (cert, "flag", false) == 0,
+        "flux_sigcert_meta_setb flag=false");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store test, test.pub worked");
     ok ((cert2 = flux_sigcert_load (name)) != NULL,
@@ -304,8 +311,10 @@ void test_json_load_dump (void)
         "flux_sigcert_meta_sets foo=bar");
     ok (flux_sigcert_meta_seti (cert, "bar", 42) == 0,
         "flux_sigcert_meta_seti bar=42");
-    ok (flux_sigcert_meta_seti (cert, "baz", 42e-27) == 0,
-        "flux_sigcert_meta_seti bar=42");
+    ok (flux_sigcert_meta_setd (cert, "baz", 42e-27) == 0,
+        "flux_sigcert_meta_setd bar=42");
+    ok (flux_sigcert_meta_setb (cert, "nerf", true) == 0,
+        "flux_sigcert_meta_setb nerf=true");
     if (flux_sigcert_store (cert, name) < 0)
         BAIL_OUT ("flux_sigcert_store");
     name = new_keypath ("test.pub");
@@ -349,6 +358,8 @@ void test_corner (void)
         BAIL_OUT ("meta_seti failed");
     if (flux_sigcert_meta_setd (cert, "test-d", 3.14) < 0)
         BAIL_OUT ("meta_setd failed");
+    if (flux_sigcert_meta_setb (cert, "test-b", true) < 0)
+        BAIL_OUT ("meta_setb failed");
 
     /* Load/store corner cases
      */
@@ -456,6 +467,9 @@ void test_corner (void)
     errno = 0;
     ok (flux_sigcert_meta_gets (cert, "test-d", &s) < 0 && errno == EINVAL,
         "flux_sigcert_meta_gets on double fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_gets (cert, "test-b", &s) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_gets on boolean fails with EINVAL");
 
     /* meta geti/seti corner cases
      */
@@ -488,6 +502,9 @@ void test_corner (void)
     errno = 0;
     ok (flux_sigcert_meta_geti (cert, "test-d", &i) < 0 && errno == EINVAL,
         "flux_sigcert_meta_geti on double fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_geti (cert, "test-b", &i) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_geti on boolean fails with EINVAL");
 
     /* meta getd/setd corner cases
      */
@@ -520,6 +537,45 @@ void test_corner (void)
     errno = 0;
     ok (flux_sigcert_meta_getd (cert, "test-i", &d) < 0 && errno == EINVAL,
         "flux_sigcert_meta_getd on int fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getd (cert, "test-b", &d) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getd on boolean fails with EINVAL");
+
+    /* meta getb/setb corner cases
+     */
+    bool b;
+    errno = 0;
+    ok (flux_sigcert_meta_setb (NULL, "a", false) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_setb cert=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_setb (cert, NULL, false) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_setb key=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_setb (cert, "a.b", false) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_setb key=a.b fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getb (NULL, "a", &b) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb cert=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getb (cert, NULL, &b) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb key=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getb (cert, ".", &b) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb key=. fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getb (cert, "a", NULL) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb value=NULL fails with EINVAL");
+    /* wrong type */
+    errno = 0;
+    ok (flux_sigcert_meta_getb (cert, "test-s", &b) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb on string fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getb (cert, "test-i", &b) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb on int fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_getb (cert, "test-d", &b) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_getb on double fails with EINVAL");
+
 
     /* Destroy NULL
      */
