@@ -43,16 +43,33 @@
 #include "src/libutil/base64.h"
 #include "sigcert.h"
 
-static char *sigcert_base64_encode (const uint8_t *srcbuf, int srclen);
-static int sigcert_base64_decode (const char *srcbuf,
-                                  uint8_t *dstbuf, int dstlen);
+/* Define some handy types for fixed length keys and their base64 encodings.
+ * N.B. macro versions of base64_encode_length() and base64_decode_length()
+ * were defined so these types can be declared in a struct or on the stack.
+ * Also, the raw types must be long enough to receive base64_decode_length()
+ * bytes in place, hence the BASE64_DECODE_MAXLEN() macro below.
+ */
+#define BASE64_ENCODE_LENGTH(srclen) (((((srclen) + 2) / 3) * 4) + 1)
+#define BASE64_DECODE_LENGTH(srclen) (((((srclen) + 3) / 4) * 3) + 1)
+
+#define BASE64_DECODE_MAXLEN(dstlen) \
+             (BASE64_DECODE_LENGTH(BASE64_ENCODE_LENGTH(dstlen)))
+
+typedef uint8_t public_t[BASE64_DECODE_MAXLEN(crypto_sign_PUBLICKEYBYTES)];
+typedef uint8_t secret_t[BASE64_DECODE_MAXLEN(crypto_sign_SECRETKEYBYTES)];
+typedef uint8_t sign_t[BASE64_DECODE_MAXLEN(crypto_sign_BYTES)];
+
+typedef char public_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_PUBLICKEYBYTES)];
+typedef char secret_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_SECRETKEYBYTES)];
+typedef char sign_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_BYTES)];
+
 
 #define FLUX_SIGCERT_MAGIC 0x2349c0ed
 struct flux_sigcert {
     int magic;
 
-    uint8_t public_key[crypto_sign_PUBLICKEYBYTES];
-    uint8_t secret_key[crypto_sign_SECRETKEYBYTES];
+    public_t public_key;
+    secret_t secret_key;
 
     json_t *meta;
 
@@ -366,51 +383,96 @@ int flux_sigcert_meta_getts (const struct flux_sigcert *cert,
     return 0;
 }
 
-/* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
- * a base64 string encoding of it.  Caller must free.
+/* encode public key 'src' to base64 'dst'
  */
-static char *sigcert_base64_encode (const uint8_t *srcbuf, int srclen)
+static void sigcert_base64_encode_public (const public_t src,
+                                          public_base64_t dst)
 {
-    char *dstbuf = NULL;
-    int dstlen;
+    int srclen = crypto_sign_PUBLICKEYBYTES;
+    int dstlen = sizeof (public_base64_t);
+    int rc;
 
-    dstlen = base64_encode_length (srclen);
-    if (!(dstbuf = malloc (dstlen)))
-        return NULL;
-    if (base64_encode_block (dstbuf, &dstlen, srcbuf, srclen) < 0) {
-        free (dstbuf);
-        errno = EINVAL;
-        return NULL;
-    }
-    return dstbuf;
+    assert (dstlen >= base64_encode_length (srclen));
+    rc = base64_encode_block (dst, &dstlen, src, srclen);
+    assert (rc == 0);
+}
+/* decode base64 'src' to public key 'dst'
+ * return 0 on success, -1 on failure
+ */
+static int sigcert_base64_decode_public (const char *src, public_t dst)
+{
+    int srclen = strlen (src);
+    int dstlen = sizeof (public_t);
+
+    if (dstlen < base64_decode_length (srclen))
+        goto inval;
+    if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
+        goto inval;
+    return 0;
+inval:
+    errno = EINVAL;
+    return -1;
 }
 
-/* Given a base64 string 'srcbuf', decode it and copy the result in
- * 'dstbuf'.  The decoded length must exactly match 'dstlen'.
+/* encode secret key 'src' to base64 'dst'
  */
-static int sigcert_base64_decode (const char *srcbuf,
-                                  uint8_t *dstbuf, int dstlen)
+static void sigcert_base64_encode_secret (const secret_t src,
+                                          secret_base64_t dst)
 {
-    int srclen, xdstlen;
-    char *xdstbuf;
+    int srclen = crypto_sign_SECRETKEYBYTES;
+    int dstlen = sizeof (secret_base64_t);
+    int rc;
 
-    srclen = strlen (srcbuf);
-    xdstlen = base64_decode_length (srclen);
-    if (!(xdstbuf = malloc (xdstlen)))
-        return -1;
-    if (base64_decode_block (xdstbuf, &xdstlen, srcbuf, srclen) < 0) {
-        free (xdstbuf);
-        errno = EINVAL;
-        return -1;;
-    }
-    if (xdstlen != dstlen) {
-        free (xdstbuf);
-        errno = EINVAL;
-        return -1;
-    }
-    memcpy (dstbuf, xdstbuf, dstlen);
-    free (xdstbuf);
+    assert (dstlen >= base64_encode_length (srclen));
+    rc = base64_encode_block (dst, &dstlen, src, srclen);
+    assert (rc == 0);
+}
+/* decode base64 'src' to secret key 'dst'
+ * return 0 on success, -1 on failure
+ */
+int sigcert_base64_decode_secret (const char *src, secret_t dst)
+{
+    int srclen = strlen (src);
+    int dstlen = sizeof (secret_t);
+
+    if (dstlen < base64_decode_length (srclen))
+        goto inval;
+    if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
+        goto inval;
     return 0;
+inval:
+    errno = EINVAL;
+    return -1;
+}
+
+/* encode signature 'src' to base64 'dst'
+ */
+static void sigcert_base64_encode_sign (const sign_t src, sign_base64_t dst)
+{
+    int srclen = crypto_sign_BYTES;
+    int dstlen = sizeof (sign_base64_t);
+    int rc;
+
+    assert (dstlen >= base64_encode_length (srclen));
+    rc = base64_encode_block (dst, &dstlen, src, srclen);
+    assert (rc == 0);
+}
+/* decode base64 'src' to signature 'dst'
+ * return 0 on success, -1 on failure
+ */
+static int sigcert_base64_decode_sign (const char *src, sign_t dst)
+{
+    int srclen = strlen (src);
+    int dstlen = sizeof (sign_t);
+
+    if (dstlen < base64_decode_length (srclen))
+        goto inval;
+    if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
+        goto inval;
+    return 0;
+inval:
+    errno = EINVAL;
+    return -1;
 }
 
 /* fopen(w) with mode parameter
@@ -435,7 +497,6 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
 static int sigcert_fwrite (const struct flux_sigcert *cert,
                            FILE *fp, bool secret)
 {
-    char *key = NULL;
     void *iter;
 
     // [metadata]
@@ -492,23 +553,20 @@ static int sigcert_fwrite (const struct flux_sigcert *cert,
     // [curve]
     if (fprintf (fp, "[curve]\n") < 0)
         goto error;
-    if (!(key = sigcert_base64_encode (cert->public_key,
-                                       crypto_sign_PUBLICKEYBYTES)))
+
+    public_base64_t pubkey;
+    sigcert_base64_encode_public (cert->public_key, pubkey);
+    if (fprintf (fp, "    public-key = \"%s\"\n", pubkey) < 0)
         goto error;
-    if (fprintf (fp, "    public-key = \"%s\"\n", key) < 0)
-        goto error;
-    free (key);
+
     if (secret) {
-        if (!(key = sigcert_base64_encode (cert->secret_key,
-                                           crypto_sign_SECRETKEYBYTES)))
+        secret_base64_t seckey;
+        sigcert_base64_encode_secret (cert->secret_key, seckey);
+        if (fprintf (fp, "    secret-key = \"%s\"\n", seckey) < 0)
             goto error;
-        if (fprintf (fp, "    secret-key = \"%s\"\n", key) < 0)
-            goto error;
-        free (key);
     }
     return 0;
 error:
-    free (key);
     return -1;
 }
 
@@ -547,14 +605,14 @@ error:
     return -1;
 }
 
-static int parse_toml_public_key (const char *raw, uint8_t *key)
+static int parse_toml_public_key (const char *raw, public_t key)
 {
     char *s = NULL;
     int rc = -1;
 
     if (toml_rtos (raw, &s) < 0)
         goto done;
-    if (sigcert_base64_decode (s, key, crypto_sign_PUBLICKEYBYTES) < 0)
+    if (sigcert_base64_decode_public (s, key) < 0)
         goto done;
     rc = 0;
 done:
@@ -562,14 +620,14 @@ done:
     return rc;
 }
 
-static int parse_toml_secret_key (const char *raw, uint8_t *key)
+static int parse_toml_secret_key (const char *raw, secret_t key)
 {
     char *s = NULL;
     int rc = -1;
 
     if (toml_rtos (raw, &s) < 0)
         goto done;
-    if (sigcert_base64_decode (s, key, crypto_sign_SECRETKEYBYTES) < 0)
+    if (sigcert_base64_decode_secret (s, key) < 0)
         goto done;
     rc = 0;
 done:
@@ -723,7 +781,7 @@ error:
 char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
 {
     json_t *obj = NULL;
-    char *xpub = NULL;
+    public_base64_t pubkey;
     int saved_errno;
     char *s;
 
@@ -731,13 +789,11 @@ char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
         errno = EINVAL;
         return NULL;
     }
-    if (!(xpub = sigcert_base64_encode (cert->public_key,
-                                                crypto_sign_PUBLICKEYBYTES)))
-        goto error;
+    sigcert_base64_encode_public (cert->public_key, pubkey);
     if (!(obj = json_pack ("{s:O,s:{s:s}}",
                            "metadata", cert->meta,
                            "curve",
-                             "public-key", xpub))) {
+                             "public-key", pubkey))) {
         errno = ENOMEM;
         goto error;
     }
@@ -746,12 +802,10 @@ char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
         goto error;
     }
     json_decref (obj);
-    free (xpub);
     return s;
 error:
     saved_errno = errno;
     json_decref (obj);
-    free (xpub);
     errno = saved_errno;
     return NULL;
 }
@@ -760,7 +814,7 @@ struct flux_sigcert *flux_sigcert_json_loads (const char *s)
 {
     json_t *obj = NULL;
     struct flux_sigcert *cert = NULL;
-    const char *xpub;
+    const char *pub;
     int saved_errno;
 
     if (!s) {
@@ -779,13 +833,14 @@ struct flux_sigcert *flux_sigcert_json_loads (const char *s)
     if (json_unpack (obj, "{s:O,s:{s:s}}",
                      "metadata", &cert->meta,
                      "curve",
-                       "public-key", &xpub) < 0) {
+                       "public-key", &pub) < 0) {
         errno = EPROTO;
         goto error;
     }
-    if (sigcert_base64_decode (xpub, cert->public_key,
-                               crypto_sign_PUBLICKEYBYTES) < 0)
+    if (sigcert_base64_decode_public (pub, cert->public_key) < 0) {
+        errno = EPROTO;
         goto error;
+    }
     json_decref (obj);
     return cert;
 error:
@@ -819,7 +874,8 @@ bool flux_sigcert_equal (const struct flux_sigcert *cert1,
 char *flux_sigcert_sign (const struct flux_sigcert *cert,
                          uint8_t *buf, int len)
 {
-    uint8_t sig[crypto_sign_BYTES];
+    sign_t sig;
+    sign_base64_t sig_base64;
 
     if (!cert || !cert->secret_valid || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
@@ -829,19 +885,20 @@ char *flux_sigcert_sign (const struct flux_sigcert *cert,
         errno = EINVAL;
         return NULL;
     }
-    return sigcert_base64_encode (sig, crypto_sign_BYTES);
+    sigcert_base64_encode_sign (sig, sig_base64);
+    return strdup (sig_base64);
 }
 
 int flux_sigcert_verify (const struct flux_sigcert *cert,
                          const char *sig_base64, uint8_t *buf, int len)
 {
-    uint8_t sig[crypto_sign_BYTES];
+    sign_t sig;
 
     if (!cert || !sig_base64 || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return -1;
     }
-    if (sigcert_base64_decode (sig_base64, sig, crypto_sign_BYTES) < 0)
+    if (sigcert_base64_decode_sign (sig_base64, sig) < 0)
         return -1;
     if (crypto_sign_verify_detached (sig, buf, len, cert->public_key) < 0) {
         errno = EINVAL;
