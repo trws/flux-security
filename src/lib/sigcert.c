@@ -203,6 +203,47 @@ int flux_sigcert_meta_geti (const struct flux_sigcert *cert,
     return 0;
 }
 
+int flux_sigcert_meta_setd (struct flux_sigcert *cert,
+                            const char *key, double d)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_real (d)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_getd (const struct flux_sigcert *cert,
+                            const char *key, double *dp)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !dp) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (!json_is_real (val)) {
+        errno = EINVAL;
+        return -1;
+    }
+    *dp = json_real_value (val);
+    return 0;
+}
+
 /* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
  * a base64 string encoding of it.  Caller must free.
  */
@@ -295,6 +336,11 @@ static int sigcert_fwrite (const struct flux_sigcert *cert,
         else if (json_is_integer (val)) {
             if (fprintf (fp, "    %s = %lld\n",
                          mkey, (long long)json_integer_value (val)) < 0)
+                goto error;
+        }
+        else if (json_is_real (val)) {
+            if (fprintf (fp, "    %s = %f\n",
+                         mkey, json_real_value (val)) < 0)
                 goto error;
         }
         else {
@@ -400,6 +446,7 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
     char *s = NULL;
     int rc = -1;
     int64_t i;
+    double d;
 
     if (toml_rtos (raw, &s) == 0) {
         if (flux_sigcert_meta_sets (cert, key, s) < 0)
@@ -407,6 +454,10 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
     }
     else if (toml_rtoi (raw, &i) == 0) {
         if (flux_sigcert_meta_seti (cert, key, i) < 0)
+            goto done;
+    }
+    else if (toml_rtod (raw, &d) == 0) {
+        if (flux_sigcert_meta_setd (cert, key, d) < 0)
             goto done;
     }
     else

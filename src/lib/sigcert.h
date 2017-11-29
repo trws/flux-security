@@ -70,6 +70,10 @@ int flux_sigcert_meta_seti (struct flux_sigcert *cert,
                             const char *key, int64_t value);
 int flux_sigcert_meta_geti (const struct flux_sigcert *cert,
                             const char *key, int64_t *value);
+int flux_sigcert_meta_setd (struct flux_sigcert *cert,
+                            const char *key, double value);
+int flux_sigcert_meta_getd (const struct flux_sigcert *cert,
+                            const char *key, double *value);
 
 #ifdef __cplusplus
 }
