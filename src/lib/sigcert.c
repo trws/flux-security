@@ -117,8 +117,8 @@ error:
     return NULL;
 }
 
-int flux_sigcert_meta_set (struct flux_sigcert *cert,
-                           const char *key, const char *s)
+int flux_sigcert_meta_sets (struct flux_sigcert *cert,
+                            const char *key, const char *s)
 {
     json_t *val;
     if (!(val = json_string (s)))
@@ -132,18 +132,22 @@ nomem:
     return -1;
 }
 
-const char *flux_sigcert_meta_get (const struct flux_sigcert *cert, const char *key)
+int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
+                            const char *key, const char **sp)
 {
     json_t *val;
     const char *s;
 
     if (!(val = json_object_get (cert->meta, key))) {
         errno = ENOENT;
-        return NULL;
+        return -1;
     }
-    if (!(s = json_string_value (val)))
+    if (!(s = json_string_value (val))) {
         errno = EINVAL;
-    return s;
+        return -1;
+    }
+    *sp = s;
+    return 0;
 }
 
 /* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
@@ -334,7 +338,7 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
 
     if (toml_rtos (raw, &s) < 0)
         goto done;
-    if (flux_sigcert_meta_set (cert, key, s) < 0)
+    if (flux_sigcert_meta_sets (cert, key, s) < 0)
         goto done;
     rc = 0;
 done:

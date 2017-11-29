@@ -62,9 +62,10 @@ int flux_sigcert_verify (const struct flux_sigcert *cert,
 
 /* Get/set metadata
  */
-int flux_sigcert_meta_set (struct flux_sigcert *cert, const char *key,
-                           const char *value);
-const char *flux_sigcert_meta_get (const struct flux_sigcert *cert, const char *key);
+int flux_sigcert_meta_sets (struct flux_sigcert *cert,
+                            const char *key, const char *value);
+int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
+                            const char *key, const char **value);
 
 #ifdef __cplusplus
 }

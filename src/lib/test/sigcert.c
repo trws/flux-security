@@ -69,16 +69,16 @@ void test_meta (void)
     cert = flux_sigcert_create ();
     ok (cert != NULL,
         "flux_sigcert_create works");
-    ok (flux_sigcert_meta_set (cert, "foo", "bar") == 0,
-        "flux_sigcert_meta_set foo=bar");
-    ok (flux_sigcert_meta_set (cert, "baz", "42") == 0,
-        "flux_sigcert_meta_set baz=42");
-    s = flux_sigcert_meta_get (cert, "foo");
-    ok (s != NULL && !strcmp (s, "bar"),
-        "flux_sigcert_meta_get foo works");
-    s = flux_sigcert_meta_get (cert, "baz");
-    ok (s != NULL && !strcmp (s, "42"),
-        "flux_sigcert_meta_get baz works");
+    ok (flux_sigcert_meta_sets (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_sets foo=bar");
+    ok (flux_sigcert_meta_sets (cert, "baz", "boink") == 0,
+        "flux_sigcert_meta_sets baz=boink");
+    ok (flux_sigcert_meta_gets (cert, "foo", &s) == 0
+        && !strcmp (s, "bar"),
+        "flux_sigcert_meta_gets foo works");
+    ok (flux_sigcert_meta_gets (cert, "baz", &s) == 0
+        && !strcmp (s, "boink"),
+        "flux_sigcert_meta_gets baz works");
 
     flux_sigcert_destroy (cert);
 }
@@ -106,8 +106,8 @@ void test_load_store (void)
      * Load it back into a different cert, and make sure keys are the same.
      */
     name = new_keypath ("test");
-    ok (flux_sigcert_meta_set (cert, "foo", "bar") == 0,
-        "flux_sigcert_meta_set foo=bar");
+    ok (flux_sigcert_meta_sets (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_sets foo=bar");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store test, test.pub worked");
     ok ((cert2 = flux_sigcert_load (name)) != NULL,
@@ -281,10 +281,10 @@ void test_json_load_dump (void)
     name = new_keypath ("test");
     if (!(cert = flux_sigcert_create ()))
         BAIL_OUT ("flux_sigcert_create");
-    ok (flux_sigcert_meta_set (cert, "foo", "42") == 0,
-        "flux_sigcert_meta_set foo=42");
-    ok (flux_sigcert_meta_set (cert, "bar", "3.14") == 0,
-        "flux_sigcert_meta_set bar=3.14");
+    ok (flux_sigcert_meta_sets (cert, "foo", "bar") == 0,
+        "flux_sigcert_meta_sets foo=bar");
+    ok (flux_sigcert_meta_sets (cert, "bar", "baz") == 0,
+        "flux_sigcert_meta_sets bar=baz");
     if (flux_sigcert_store (cert, name) < 0)
         BAIL_OUT ("flux_sigcert_store");
     name = new_keypath ("test.pub");
