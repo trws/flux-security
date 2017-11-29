@@ -56,7 +56,6 @@ struct flux_sigcert {
 
     json_t *meta;
 
-    bool sodium_initialized;
     bool secret_valid;
 };
 
@@ -74,10 +73,22 @@ void flux_sigcert_destroy (struct flux_sigcert *cert)
     }
 }
 
+/* sodium_init() must be called before any other libsodium functions.
+ * Checking here should be sufficient since there can be no calls from
+ * this module without certs, and all certs are created here.
+ */
 struct flux_sigcert *sigcert_create (void)
 {
     struct flux_sigcert *cert;
+    static bool sodium_initialized = false;
 
+    if (!sodium_initialized) {
+        if (sodium_init () < 0) {
+            errno = EINVAL;
+            return NULL;
+        }
+        sodium_initialized = true;
+    }
     if (!(cert = calloc (1, sizeof (*cert))))
         return NULL;
     cert->magic = FLUX_SIGCERT_MAGIC;
@@ -97,11 +108,6 @@ struct flux_sigcert *flux_sigcert_create (void)
 
     if (!(cert = sigcert_create ()))
         goto error;
-    if (sodium_init () < 0) {
-        errno = EINVAL;
-        goto error;
-    }
-    cert->sodium_initialized = true;
     if (crypto_sign_keypair (cert->public_key, cert->secret_key) < 0)
         goto error;
     cert->secret_valid = true;
@@ -528,13 +534,6 @@ char *flux_sigcert_sign (struct flux_sigcert *cert, uint8_t *buf, int len)
         errno = EINVAL;
         return NULL;
     }
-    if (!cert->sodium_initialized) {
-        if (sodium_init () < 0) {
-            errno = EINVAL;
-            return NULL;
-        }
-        cert->sodium_initialized = true;
-    }
     if (crypto_sign_detached (sig, NULL, buf, len, cert->secret_key) < 0) {
         errno = EINVAL;
         return NULL;
@@ -550,13 +549,6 @@ int flux_sigcert_verify (struct flux_sigcert *cert,
     if (!cert || !sig_base64 || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return -1;
-    }
-    if (!cert->sodium_initialized) {
-        if (sodium_init () < 0) {
-            errno = EINVAL;
-            return -1;
-        }
-        cert->sodium_initialized = true;
     }
     if (sigcert_base64_decode (sig_base64, sig, crypto_sign_BYTES) < 0)
         return -1;
