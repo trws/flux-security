@@ -395,6 +395,34 @@ void test_corner (void)
     ok (flux_sigcert_json_loads ("{\"curve\":{}}") == NULL && errno == EPROTO,
         "flux_sigcert_json_loads s=valid/wrong fails with EPROTO");
 
+    /* meta get/set corner cases
+     */
+    const char *s;
+    errno = 0;
+    ok (flux_sigcert_meta_sets (NULL, "a", "b") < 0 && errno == EINVAL,
+        "flux_sigcert_meta_sets cert=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_sets (cert, NULL, "b") < 0 && errno == EINVAL,
+        "flux_sigcert_meta_sets key=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_sets (cert, "a.b", "b") < 0 && errno == EINVAL,
+        "flux_sigcert_meta_sets key=a.b fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_sets (cert, "a", NULL) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_sets value=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_gets (NULL, "a", &s) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_gets cert=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_gets (cert, NULL, &s) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_gets key=NULL fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_gets (cert, ".", &s) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_gets key=. fails with EINVAL");
+    errno = 0;
+    ok (flux_sigcert_meta_gets (cert, "a", NULL) < 0 && errno == EINVAL,
+        "flux_sigcert_meta_gets value=NULL fails with EINVAL");
+
     /* Destroy NULL
      */
     lives_ok ({flux_sigcert_destroy (NULL);},

@@ -117,10 +117,18 @@ error:
     return NULL;
 }
 
+/* Don't allow '.' in a key or when it's written out to TOML
+ * it will look like TOML hierarchy.
+ */
 int flux_sigcert_meta_sets (struct flux_sigcert *cert,
                             const char *key, const char *s)
 {
     json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !s) {
+        errno = EINVAL;
+        return -1;
+    }
     if (!(val = json_string (s)))
         goto nomem;
     if (json_object_set_new (cert->meta, key, val) < 0)
@@ -138,6 +146,10 @@ int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
     json_t *val;
     const char *s;
 
+    if (!cert || !key || strchr (key, '.') || !sp) {
+        errno = EINVAL;
+        return -1;
+    }
     if (!(val = json_object_get (cert->meta, key))) {
         errno = ENOENT;
         return -1;
