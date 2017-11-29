@@ -56,7 +56,6 @@ struct flux_sigcert {
 
     json_t *meta;
 
-    bool sodium_initialized;
     bool secret_valid;
 };
 
@@ -74,10 +73,22 @@ void flux_sigcert_destroy (struct flux_sigcert *cert)
     }
 }
 
+/* sodium_init() must be called before any other libsodium functions.
+ * Checking here should be sufficient since there can be no calls from
+ * this module without certs, and all certs are created here.
+ */
 struct flux_sigcert *sigcert_create (void)
 {
     struct flux_sigcert *cert;
+    static bool sodium_initialized = false;
 
+    if (!sodium_initialized) {
+        if (sodium_init () < 0) {
+            errno = EINVAL;
+            return NULL;
+        }
+        sodium_initialized = true;
+    }
     if (!(cert = calloc (1, sizeof (*cert))))
         return NULL;
     cert->magic = FLUX_SIGCERT_MAGIC;
@@ -97,11 +108,6 @@ struct flux_sigcert *flux_sigcert_create (void)
 
     if (!(cert = sigcert_create ()))
         goto error;
-    if (sodium_init () < 0) {
-        errno = EINVAL;
-        goto error;
-    }
-    cert->sodium_initialized = true;
     if (crypto_sign_keypair (cert->public_key, cert->secret_key) < 0)
         goto error;
     cert->secret_valid = true;
@@ -111,10 +117,18 @@ error:
     return NULL;
 }
 
-int flux_sigcert_meta_set (struct flux_sigcert *cert,
-                           const char *key, const char *s)
+/* Don't allow '.' in a key or when it's written out to TOML
+ * it will look like TOML hierarchy.
+ */
+int flux_sigcert_meta_sets (struct flux_sigcert *cert,
+                            const char *key, const char *s)
 {
     json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !s) {
+        errno = EINVAL;
+        return -1;
+    }
     if (!(val = json_string (s)))
         goto nomem;
     if (json_object_set_new (cert->meta, key, val) < 0)
@@ -126,18 +140,230 @@ nomem:
     return -1;
 }
 
-const char *flux_sigcert_meta_get (struct flux_sigcert *cert, const char *key)
+int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
+                            const char *key, const char **sp)
 {
     json_t *val;
     const char *s;
 
+    if (!cert || !key || strchr (key, '.') || !sp) {
+        errno = EINVAL;
+        return -1;
+    }
     if (!(val = json_object_get (cert->meta, key))) {
         errno = ENOENT;
-        return NULL;
+        return -1;
     }
-    if (!(s = json_string_value (val)))
+    if (!(s = json_string_value (val))) {
         errno = EINVAL;
-    return s;
+        return -1;
+    }
+    *sp = s;
+    return 0;
+}
+
+int flux_sigcert_meta_seti (struct flux_sigcert *cert,
+                            const char *key, int64_t i)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_integer ((json_int_t)i)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_geti (const struct flux_sigcert *cert,
+                            const char *key, int64_t *ip)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !ip) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (!json_is_integer (val)) {
+        errno = EINVAL;
+        return -1;
+    }
+    *ip = json_integer_value (val);
+    return 0;
+}
+
+int flux_sigcert_meta_setd (struct flux_sigcert *cert,
+                            const char *key, double d)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_real (d)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_getd (const struct flux_sigcert *cert,
+                            const char *key, double *dp)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !dp) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (!json_is_real (val)) {
+        errno = EINVAL;
+        return -1;
+    }
+    *dp = json_real_value (val);
+    return 0;
+}
+
+int flux_sigcert_meta_setb (struct flux_sigcert *cert,
+                            const char *key, bool b)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    val = b ? json_true () : json_false ();
+    if (!val)
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_getb (const struct flux_sigcert *cert,
+                            const char *key, bool *bp)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !bp) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (!json_is_true (val) && !json_is_false (val)) {
+        errno = EINVAL;
+        return -1;
+    }
+    *bp = json_is_true (val) ? true : false;
+    return 0;
+}
+
+/* Convert time_t (GMT) to ISO 8601 timestamp, e.g. 2003-08-24T05:14:50Z
+ */
+static int timetostr (time_t t, char *buf, int size)
+{
+    struct tm tm;
+    if (!gmtime_r (&t, &tm))
+        return -1;
+    if (strftime (buf, size, "%FT%TZ", &tm) == 0)
+        return -1;
+    return 0;
+}
+
+static int strtotime (const char *s, time_t *tp)
+{
+    struct tm tm;
+    time_t t;
+    if (!strptime (s, "%FT%TZ", &tm))
+        return -1;
+    if ((t = timegm (&tm)) < 0)
+        return -1;
+    *tp = t;
+    return 0;
+}
+
+/* Timestamp is the only TOML type that doesn't have a corresponding
+ * JSON type.  Represent it as a JSON object that looks like this:
+ *   { "iso-8601-ts" : "2003-08-24T05:14:50Z" }
+ * Since this is the only metadata represented as an object, and
+ * metadata is strictly a flat list, this cannot be confused with any
+ * of the other metadata types.
+ */
+int flux_sigcert_meta_setts (struct flux_sigcert *cert,
+                             const char *key, time_t t)
+{
+    json_t *val;
+    char timebuf[80];
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (timetostr (t, timebuf, sizeof (timebuf)) < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_pack ("{s:s}", "iso-8601-ts", timebuf)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_getts (const struct flux_sigcert *cert,
+                             const char *key, time_t *tp)
+{
+    json_t *val;
+    const char *s;
+    time_t t;
+
+    if (!cert || !key || strchr (key, '.') || !tp) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (json_unpack (val, "{s:s}", "iso-8601-ts", &s) < 0
+                                    || strtotime (s, &t) < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    *tp = t;
+    return 0;
 }
 
 /* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
@@ -206,7 +432,8 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
 /* Write cert contents to 'fp' in TOML format.
  * If secret=true, include secret key.
  */
-static int sigcert_fwrite (struct flux_sigcert *cert, FILE *fp, bool secret)
+static int sigcert_fwrite (const struct flux_sigcert *cert,
+                           FILE *fp, bool secret)
 {
     char *key = NULL;
     void *iter;
@@ -218,14 +445,45 @@ static int sigcert_fwrite (struct flux_sigcert *cert, FILE *fp, bool secret)
     while (iter) {
         const char *mkey = json_object_iter_key (iter);
         json_t *val = json_object_iter_value (iter);
-        const char *s;
 
-        if (!mkey || !val || !(s = json_string_value (val))) {
+        if (!mkey || !val) {
             errno = EINVAL;
             goto error;
         }
-        if (fprintf (fp, "    %s = \"%s\"\n", mkey, s) < 0)
+        if (json_is_string (val)) {
+            if (fprintf (fp, "    %s = \"%s\"\n",
+                         mkey, json_string_value (val)) < 0)
+                goto error;
+        }
+        else if (json_is_true (val)) {
+            if (fprintf (fp, "    %s = true\n", mkey) < 0)
+                goto error;
+        }
+        else if (json_is_false (val)) {
+            if (fprintf (fp, "    %s = false\n", mkey) < 0)
+                goto error;
+        }
+        else if (json_is_integer (val)) {
+            if (fprintf (fp, "    %s = %lld\n",
+                         mkey, (long long)json_integer_value (val)) < 0)
+                goto error;
+        }
+        else if (json_is_real (val)) {
+            if (fprintf (fp, "    %s = %f\n",
+                         mkey, json_real_value (val)) < 0)
+                goto error;
+        }
+        else if (json_is_object (val)) {
+            const char *s;
+            if (json_unpack (val, "{s:s}", "iso-8601-ts", &s) < 0)
+                goto error;
+            if (fprintf (fp, "    %s = %s\n", mkey, s) < 0)
+                goto error;
+        }
+        else {
+            errno = EINVAL;
             goto error;
+        }
         iter = json_object_iter_next (cert->meta, iter);
     }
     if (fprintf (fp, "\n") < 0)
@@ -254,7 +512,7 @@ error:
     return -1;
 }
 
-int flux_sigcert_store (struct flux_sigcert *cert, const char *name)
+int flux_sigcert_store (const struct flux_sigcert *cert, const char *name)
 {
     FILE *fp = NULL;
     const int pubsz = PATH_MAX + 1;
@@ -324,10 +582,47 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
 {
     char *s = NULL;
     int rc = -1;
+    int64_t i;
+    double d;
+    int b;
+    toml_timestamp_t ts;
 
-    if (toml_rtos (raw, &s) < 0)
-        goto done;
-    if (flux_sigcert_meta_set (cert, key, s) < 0)
+    if (toml_rtos (raw, &s) == 0) {
+        if (flux_sigcert_meta_sets (cert, key, s) < 0)
+            goto done;
+    }
+    else if (toml_rtob (raw, &b) == 0) {
+        if (flux_sigcert_meta_setb (cert, key, b) < 0)
+            goto done;
+    }
+    else if (toml_rtoi (raw, &i) == 0) {
+        if (flux_sigcert_meta_seti (cert, key, i) < 0)
+            goto done;
+    }
+    else if (toml_rtod (raw, &d) == 0) {
+        if (flux_sigcert_meta_setd (cert, key, d) < 0)
+            goto done;
+    }
+    else if (toml_rtots (raw, &ts) == 0) {
+        struct tm tm;
+        time_t t;
+        if (!ts.year || !ts.month || !ts.day)
+            goto done;
+        if (!ts.hour || !ts.minute || !ts.second)
+            goto done;
+        memset (&tm, 0, sizeof (tm));
+        tm.tm_year = *ts.year - 1900;
+        tm.tm_mon = *ts.month - 1;
+        tm.tm_mday = *ts.day;
+        tm.tm_hour = *ts.hour;
+        tm.tm_min = *ts.minute;
+        tm.tm_sec = *ts.second;
+        if ((t = timegm (&tm)) < 0)
+            goto done;
+        if (flux_sigcert_meta_setts (cert, key, t) < 0)
+            goto done;
+    }
+    else
         goto done;
     rc = 0;
 done:
@@ -425,7 +720,7 @@ error:
     return NULL;
 }
 
-char *flux_sigcert_json_dumps (struct flux_sigcert *cert)
+char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
 {
     json_t *obj = NULL;
     char *xpub = NULL;
@@ -501,7 +796,8 @@ error:
     return NULL;
 }
 
-bool flux_sigcert_equal (struct flux_sigcert *cert1, struct flux_sigcert *cert2)
+bool flux_sigcert_equal (const struct flux_sigcert *cert1,
+                         const struct flux_sigcert *cert2)
 {
     if (!cert1 || !cert2)
         return false;
@@ -520,20 +816,14 @@ bool flux_sigcert_equal (struct flux_sigcert *cert1, struct flux_sigcert *cert2)
     return true;
 }
 
-char *flux_sigcert_sign (struct flux_sigcert *cert, uint8_t *buf, int len)
+char *flux_sigcert_sign (const struct flux_sigcert *cert,
+                         uint8_t *buf, int len)
 {
     uint8_t sig[crypto_sign_BYTES];
 
     if (!cert || !cert->secret_valid || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return NULL;
-    }
-    if (!cert->sodium_initialized) {
-        if (sodium_init () < 0) {
-            errno = EINVAL;
-            return NULL;
-        }
-        cert->sodium_initialized = true;
     }
     if (crypto_sign_detached (sig, NULL, buf, len, cert->secret_key) < 0) {
         errno = EINVAL;
@@ -542,7 +832,7 @@ char *flux_sigcert_sign (struct flux_sigcert *cert, uint8_t *buf, int len)
     return sigcert_base64_encode (sig, crypto_sign_BYTES);
 }
 
-int flux_sigcert_verify (struct flux_sigcert *cert,
+int flux_sigcert_verify (const struct flux_sigcert *cert,
                          const char *sig_base64, uint8_t *buf, int len)
 {
     uint8_t sig[crypto_sign_BYTES];
@@ -550,13 +840,6 @@ int flux_sigcert_verify (struct flux_sigcert *cert,
     if (!cert || !sig_base64 || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return -1;
-    }
-    if (!cert->sodium_initialized) {
-        if (sodium_init () < 0) {
-            errno = EINVAL;
-            return -1;
-        }
-        cert->sodium_initialized = true;
     }
     if (sigcert_base64_decode (sig_base64, sig, crypto_sign_BYTES) < 0)
         return -1;
