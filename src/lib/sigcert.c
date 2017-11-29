@@ -162,6 +162,47 @@ int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
     return 0;
 }
 
+int flux_sigcert_meta_seti (struct flux_sigcert *cert,
+                            const char *key, int64_t i)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.')) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_integer ((json_int_t)i)))
+        goto nomem;
+    if (json_object_set_new (cert->meta, key, val) < 0)
+        goto nomem;
+    return 0;
+nomem:
+    json_decref (val);
+    errno = ENOMEM;
+    return -1;
+}
+
+int flux_sigcert_meta_geti (const struct flux_sigcert *cert,
+                            const char *key, int64_t *ip)
+{
+    json_t *val;
+
+    if (!cert || !key || strchr (key, '.') || !ip) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!(val = json_object_get (cert->meta, key))) {
+        errno = ENOENT;
+        return -1;
+    }
+    if (!json_is_integer (val)) {
+        errno = EINVAL;
+        return -1;
+    }
+    *ip = json_integer_value (val);
+    return 0;
+}
+
 /* Given 'srcbuf', a byte sequence 'srclen' bytes long, return
  * a base64 string encoding of it.  Caller must free.
  */
@@ -241,14 +282,25 @@ static int sigcert_fwrite (const struct flux_sigcert *cert,
     while (iter) {
         const char *mkey = json_object_iter_key (iter);
         json_t *val = json_object_iter_value (iter);
-        const char *s;
 
-        if (!mkey || !val || !(s = json_string_value (val))) {
+        if (!mkey || !val) {
             errno = EINVAL;
             goto error;
         }
-        if (fprintf (fp, "    %s = \"%s\"\n", mkey, s) < 0)
+        if (json_is_string (val)) {
+            if (fprintf (fp, "    %s = \"%s\"\n",
+                         mkey, json_string_value (val)) < 0)
+                goto error;
+        }
+        else if (json_is_integer (val)) {
+            if (fprintf (fp, "    %s = %lld\n",
+                         mkey, (long long)json_integer_value (val)) < 0)
+                goto error;
+        }
+        else {
+            errno = EINVAL;
             goto error;
+        }
         iter = json_object_iter_next (cert->meta, iter);
     }
     if (fprintf (fp, "\n") < 0)
@@ -347,10 +399,17 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
 {
     char *s = NULL;
     int rc = -1;
+    int64_t i;
 
-    if (toml_rtos (raw, &s) < 0)
-        goto done;
-    if (flux_sigcert_meta_sets (cert, key, s) < 0)
+    if (toml_rtos (raw, &s) == 0) {
+        if (flux_sigcert_meta_sets (cert, key, s) < 0)
+            goto done;
+    }
+    else if (toml_rtoi (raw, &i) == 0) {
+        if (flux_sigcert_meta_seti (cert, key, i) < 0)
+            goto done;
+    }
+    else
         goto done;
     rc = 0;
 done:
