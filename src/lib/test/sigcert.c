@@ -652,8 +652,10 @@ void test_corner (void)
 
 void test_sign_cert (void)
 {
-    struct flux_sigcert *cert;
+    struct flux_sigcert *cert, *cert2;
     struct flux_sigcert *ca;
+    const char *name;
+    char *s;
 
     if (!(cert = flux_sigcert_create ()))
         BAIL_OUT ("flux_sigcert_create: %s", strerror (errno));
@@ -674,6 +676,34 @@ void test_sign_cert (void)
         "flux_sigcert_sign_cert works");
     ok (flux_sigcert_verify_cert (ca, cert) == 0,
         "flux_sigcert_verify_cert works");
+
+    /* Verification of a signed cert still works after JSON serialization.
+     */
+    s = flux_sigcert_json_dumps (cert);
+    ok (s != NULL,
+        "flux_sigcert_json_dumps works on signed cert");
+    cert2 = flux_sigcert_json_loads (s);
+    ok (cert2 != NULL,
+        "flux_sigcert_json_loads works on signed cert");
+    ok (flux_sigcert_verify_cert (ca, cert2) == 0,
+        "flux_sigcert_verify_cert works after JSON dumps/loads");
+    flux_sigcert_destroy (cert2);
+
+    /* Verification of a signed cert still works after TOML serialization.
+     */
+    new_scratchdir ();
+    name = new_keypath ("test");
+    ok (flux_sigcert_store (cert, name) == 0,
+        "flux_sigcert_store works on signed cert");
+    cert2 = flux_sigcert_load (name, false);
+    ok (cert2 != NULL,
+        "flux_sigcert_load works on signed cert");
+    ok (flux_sigcert_verify_cert (ca, cert2) == 0,
+        "flux_sigcert_verify_cert works on reloaded cert");
+    flux_sigcert_destroy (cert2);
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+    cleanup_scratchdir ();
 
     /* Verification of a signed but modified cert fails.
      */
