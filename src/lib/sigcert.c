@@ -411,6 +411,8 @@ static int sigcert_base64_decode_public (const char *src, public_t dst)
         goto inval;
     if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
         goto inval;
+    if (dstlen != crypto_sign_PUBLICKEYBYTES)
+        goto inval;
     return 0;
 inval:
     errno = EINVAL;
@@ -442,6 +444,8 @@ int sigcert_base64_decode_secret (const char *src, secret_t dst)
         goto inval;
     if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
         goto inval;
+    if (dstlen != crypto_sign_SECRETKEYBYTES)
+        goto inval;
     return 0;
 inval:
     errno = EINVAL;
@@ -471,6 +475,8 @@ static int sigcert_base64_decode_sign (const char *src, sign_t dst)
     if (dstlen < base64_decode_length (srclen))
         goto inval;
     if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
+        goto inval;
+    if (dstlen != crypto_sign_BYTES)
         goto inval;
     return 0;
 inval:
