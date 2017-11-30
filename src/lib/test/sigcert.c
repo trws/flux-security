@@ -708,6 +708,156 @@ void test_sign_cert (void)
     flux_sigcert_destroy (ca);
 }
 
+static const char *goodcert_pub =
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n";
+
+static const char *goodcert =
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+828J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzqVA==\"\n";
+
+static const char *badcerts_secret[] = {
+  // 0 - no secret key
+  "[curve]\n",
+
+  // 1 - no curve section
+  "\n",
+
+  // 2 - invalid base64 secret-key
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+8.8J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzqVA==\"\n",
+
+  // 3 - short secret-key (but valid base64)
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+828J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzq\n",
+
+  // 4 - long secret-key (but valid base64)
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+828J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzqVGE=\n",
+
+};
+static const int badcerts_secret_count = sizeof (badcerts_secret)
+                                        / sizeof (badcerts_secret[0]);
+
+static const char *badcerts[] = {
+  // 0 - no public key
+  "[metadata]\n"
+  "[curve]\n",
+
+  // 1 - no metadata section
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/GoE7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKziiAg==\"\n",
+
+  // 2 - no curve section
+  "[metadata]\n",
+
+  // 3 - invalid base64 public-key
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4m.jnwbC/0gTYAG2d9yReTJwc=\"\n",
+
+  // 4 - short public-key (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJw==\"\n",
+
+  // 5 - long public-key (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwdh\"\n",
+
+  // 6 - invalid base64 signature
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/G.E7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKziiAg==\"\n",
+
+  // 6 - short signature (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/GoE7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKzii\"\n",
+
+  // 7 - long signature (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/GoE7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKziiAmE=\"\n",
+};
+static const int badcerts_count = sizeof (badcerts) / sizeof (badcerts[0]);
+
+void create_file_content (const char *path, const void *content, size_t size)
+{
+    FILE *fp = fopen (path, "w+");
+    if (!fp)
+        BAIL_OUT ("%s: fopen: %s", path, strerror (errno));
+    if (fwrite (content, size, 1, fp) != 1)
+        BAIL_OUT ("%s: fwrite: %s", path, strerror (errno));
+    if (fclose (fp) < 0)
+        BAIL_OUT ("%s: fclose: %s", path, strerror (errno));
+}
+
+bool check_public_file (const char *content)
+{
+    struct flux_sigcert *cert;
+    bool valid = false;
+    const char *name;
+
+    name = new_keypath ("test.pub");
+    create_file_content (name, content, strlen (content));
+
+    name = new_keypath ("test");
+    if ((cert = flux_sigcert_load (name, false))) {
+        flux_sigcert_destroy (cert);
+        valid = true;
+    }
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+    return valid;
+}
+
+bool check_secret_file (const char *content)
+{
+    struct flux_sigcert *cert;
+    bool valid = false;
+    const char *name;
+
+    name = new_keypath ("test.pub");
+    create_file_content (name, goodcert_pub, strlen (goodcert_pub));
+
+    name = new_keypath ("test");
+    create_file_content (name, content, strlen (content));
+
+    if ((cert = flux_sigcert_load (name, true))) {
+        flux_sigcert_destroy (cert);
+        valid = true;
+    }
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+    return valid;
+}
+
+void test_badcert (void)
+{
+    int i;
+
+    ok (check_public_file (goodcert_pub) == true,
+        "sanity check good public cert");
+    ok (check_secret_file (goodcert) == true,
+        "sanity check good secret cert");
+
+    for (i = 0; i < badcerts_count; i++) {
+        ok (check_public_file (badcerts[i]) == false,
+            "flux_sigcert_load failed on bad public cert %d", i);
+    }
+    for (i = 0; i < badcerts_secret_count; i++) {
+        ok (check_secret_file (badcerts_secret[i]) == false,
+            "flux_sigcert_load failed on bad secret cert %d", i);
+    }
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -720,6 +870,7 @@ int main (int argc, char *argv[])
     test_json_load_dump ();
     test_corner ();
     test_sign_cert ();
+    test_badcert ();
 
     cleanup_scratchdir ();
     done_testing ();
@@ -728,4 +879,3 @@ int main (int argc, char *argv[])
 /*
  * vi: ts=4 sw=4 expandtab
  */
-
