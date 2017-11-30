@@ -113,8 +113,6 @@ void test_load_store (void)
     struct flux_sigcert *cert2;
     const char *name;
 
-    new_scratchdir ();
-
     /* Create a certificate.
      * Create another one and make sure keys are different.
      */
@@ -202,7 +200,6 @@ void test_load_store (void)
     cleanup_keypath ("test.pub");
     cleanup_keypath ("foo");
     cleanup_keypath ("foo.pub");
-    cleanup_scratchdir ();
 }
 
 void test_sign_verify (void)
@@ -306,8 +303,6 @@ void test_json_load_dump (void)
     char *s;
     const char *name;
 
-    new_scratchdir ();
-
     /* Store a cert to test, test.pub, then load cert_pub with
      * only the public key.
      */
@@ -350,8 +345,6 @@ void test_json_load_dump (void)
 
     cleanup_keypath ("test");
     cleanup_keypath ("test.pub");
-
-    cleanup_scratchdir ();
 }
 
 void test_corner (void)
@@ -691,7 +684,6 @@ void test_sign_cert (void)
 
     /* Verification of a signed cert still works after TOML serialization.
      */
-    new_scratchdir ();
     name = new_keypath ("test");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store works on signed cert");
@@ -703,7 +695,6 @@ void test_sign_cert (void)
     flux_sigcert_destroy (cert2);
     cleanup_keypath ("test");
     cleanup_keypath ("test.pub");
-    cleanup_scratchdir ();
 
     /* Verification of a signed but modified cert fails.
      */
@@ -720,17 +711,17 @@ void test_sign_cert (void)
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
+    new_scratchdir ();
 
     test_meta ();
     test_load_store ();
     test_sign_verify();
     test_json_load_dump_sign ();
     test_json_load_dump ();
-
     test_corner ();
-
     test_sign_cert ();
 
+    cleanup_scratchdir ();
     done_testing ();
 }
 
