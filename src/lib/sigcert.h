@@ -8,8 +8,8 @@
 /* Certificate class for signing/verification.
  *
  * Keys can be loaded/stored from TOML based certificate files.
- * The "secret" version of the certificate contains everything.
- * The "public" version of the certificate contains all but private keys.
+ * The "secret" file only contains the secret-key.
+ * The "public" file contains the public-key, metadata and signature.
  * The public version is distinguished by a .pub extension (like ssh keys).
  */
 
@@ -27,9 +27,10 @@ void flux_sigcert_destroy (struct flux_sigcert *cert);
  */
 struct flux_sigcert *flux_sigcert_create (void);
 
-/* Load cert from file 'name', falling back to 'name.pub'.
+/* Load cert from file 'name.pub'.
+ * If secret=true, load secret-key from 'name' also.
  */
-struct flux_sigcert *flux_sigcert_load (const char *name);
+struct flux_sigcert *flux_sigcert_load (const char *name, bool secret);
 
 /* Store cert to 'name' and 'name.pub'.
  */
@@ -59,6 +60,19 @@ char *flux_sigcert_sign (const struct flux_sigcert *cert,
  */
 int flux_sigcert_verify (const struct flux_sigcert *cert,
                          const char *signature, uint8_t *buf, int len);
+
+/* Use cert1 to sign cert2.
+ * The signature covers public key and all metadata.
+ * It does not cover secret key or existing signature, if any.
+ * The signature is embedded in cert2.
+ */
+int flux_sigcert_sign_cert (const struct flux_sigcert *cert1,
+                            struct flux_sigcert *cert2);
+
+/* Use cert1 to verify cert2's embedded signature.
+ */
+int flux_sigcert_verify_cert (const struct flux_sigcert *cert1,
+                              const struct flux_sigcert *cert2);
 
 
 /* Get/set metadata

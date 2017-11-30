@@ -113,8 +113,6 @@ void test_load_store (void)
     struct flux_sigcert *cert2;
     const char *name;
 
-    new_scratchdir ();
-
     /* Create a certificate.
      * Create another one and make sure keys are different.
      */
@@ -142,7 +140,7 @@ void test_load_store (void)
         "flux_sigcert_meta_setts time=now");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store test, test.pub worked");
-    ok ((cert2 = flux_sigcert_load (name)) != NULL,
+    ok ((cert2 = flux_sigcert_load (name, true)) != NULL,
         "flux_sigcert_load test worked");
     diag_cert ("cert", cert);
     diag_cert ("cert2", cert2);
@@ -163,8 +161,8 @@ void test_load_store (void)
 
     /* Load just the public key and verify keys are different
      */
-    name = new_keypath ("test.pub");
-    ok ((cert2 = flux_sigcert_load (name)) != NULL,
+    name = new_keypath ("test");
+    ok ((cert2 = flux_sigcert_load (name, false)) != NULL,
         "flux_sigcert_load test.pub worked");
     ok (flux_sigcert_equal (cert, cert2) == false,
         "pub cert differs from secret one");
@@ -189,7 +187,7 @@ void test_load_store (void)
         BAIL_OUT ("chdir %s: %s", scratch, strerror (errno));
     ok (flux_sigcert_store (cert, "foo") == 0,
         "flux_sigcert_store works with relative path");
-    cert2 = flux_sigcert_load ("foo");
+    cert2 = flux_sigcert_load ("foo", true);
     ok (cert2 != NULL,
         "flux_sigcert_load works with relative path");
     if (chdir (cwd) < 0)
@@ -202,7 +200,6 @@ void test_load_store (void)
     cleanup_keypath ("test.pub");
     cleanup_keypath ("foo");
     cleanup_keypath ("foo.pub");
-    cleanup_scratchdir ();
 }
 
 void test_sign_verify (void)
@@ -306,11 +303,8 @@ void test_json_load_dump (void)
     char *s;
     const char *name;
 
-    new_scratchdir ();
-
-    /* Store a cert to test, test.pub, then load cert_pub from
-     * test.pub so we have one containing only the public key.
-     * (json codec never transfers the secret key)
+    /* Store a cert to test, test.pub, then load cert_pub with
+     * only the public key.
      */
     name = new_keypath ("test");
     if (!(cert = flux_sigcert_create ()))
@@ -327,8 +321,7 @@ void test_json_load_dump (void)
         "flux_sigcert_meta_setb time=now");
     if (flux_sigcert_store (cert, name) < 0)
         BAIL_OUT ("flux_sigcert_store");
-    name = new_keypath ("test.pub");
-    ok ((cert_pub = flux_sigcert_load (name)) != NULL,
+    ok ((cert_pub = flux_sigcert_load (name, false)) != NULL,
         "flux_sigcert_load test.pub worked");
 
     /* Dump cert_pub to json string, then load cert2 from
@@ -352,8 +345,6 @@ void test_json_load_dump (void)
 
     cleanup_keypath ("test");
     cleanup_keypath ("test.pub");
-
-    cleanup_scratchdir ();
 }
 
 void test_corner (void)
@@ -385,10 +376,10 @@ void test_corner (void)
     ok (flux_sigcert_store (NULL, "foo") < 0 && errno == EINVAL,
         "flux_sigcert_store cert=NULL fails with EINVAL");
     errno = 0;
-    ok (flux_sigcert_load (NULL) == NULL && errno == EINVAL,
+    ok (flux_sigcert_load (NULL, true) == NULL && errno == EINVAL,
         "flux_sigcert_load name=NULL fails with EINVAL");
     errno = 0;
-    ok (flux_sigcert_load ("/noexist") == NULL && errno == ENOENT,
+    ok (flux_sigcert_load ("/noexist", true) == NULL && errno == ENOENT,
         "flux_sigcert_load name=/noexist fails with ENOENT");
     ok (flux_sigcert_equal (NULL, cert) == false,
         "flux_sigcert_load cert1=NULL returns false");
@@ -652,22 +643,239 @@ void test_corner (void)
     flux_sigcert_destroy (cert);
 }
 
+void test_sign_cert (void)
+{
+    struct flux_sigcert *cert, *cert2;
+    struct flux_sigcert *ca;
+    const char *name;
+    char *s;
+
+    if (!(cert = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create: %s", strerror (errno));
+    if (flux_sigcert_meta_sets (cert, "username", "itsme") < 0)
+        BAIL_OUT ("meta_sets failed");
+    if (!(ca = flux_sigcert_create ()))
+        BAIL_OUT ("flux_sigcert_create: %s", strerror (errno));
+
+    /* Verification of an unsigned cert fails.
+     */
+    errno = 0;
+    ok (flux_sigcert_verify_cert (ca, cert) < 0 && errno == EINVAL,
+        "flux_sigcert_verify_cert fails with EINVAL");
+
+    /* CA signs and verifies cert.
+     */
+    ok (flux_sigcert_sign_cert (ca, cert) == 0,
+        "flux_sigcert_sign_cert works");
+    ok (flux_sigcert_verify_cert (ca, cert) == 0,
+        "flux_sigcert_verify_cert works");
+
+    /* Verification of a signed cert still works after JSON serialization.
+     */
+    s = flux_sigcert_json_dumps (cert);
+    ok (s != NULL,
+        "flux_sigcert_json_dumps works on signed cert");
+    cert2 = flux_sigcert_json_loads (s);
+    ok (cert2 != NULL,
+        "flux_sigcert_json_loads works on signed cert");
+    ok (flux_sigcert_verify_cert (ca, cert2) == 0,
+        "flux_sigcert_verify_cert works after JSON dumps/loads");
+    flux_sigcert_destroy (cert2);
+
+    /* Verification of a signed cert still works after TOML serialization.
+     */
+    name = new_keypath ("test");
+    ok (flux_sigcert_store (cert, name) == 0,
+        "flux_sigcert_store works on signed cert");
+    cert2 = flux_sigcert_load (name, false);
+    ok (cert2 != NULL,
+        "flux_sigcert_load works on signed cert");
+    ok (flux_sigcert_verify_cert (ca, cert2) == 0,
+        "flux_sigcert_verify_cert works on reloaded cert");
+    flux_sigcert_destroy (cert2);
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+
+    /* Verification of a signed but modified cert fails.
+     */
+    ok (flux_sigcert_meta_sets (cert, "username", "noitsme") == 0,
+        "flux_sigcert_meta_sets changes signed cert");
+    errno = 0;
+    ok (flux_sigcert_verify_cert (ca, cert) < 0 && errno == EINVAL,
+        "flux_sigcert_verify_cert fails with EINVAL");
+
+    flux_sigcert_destroy (cert);
+    flux_sigcert_destroy (ca);
+}
+
+static const char *goodcert_pub =
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n";
+
+static const char *goodcert =
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+828J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzqVA==\"\n";
+
+static const char *badcerts_secret[] = {
+  // 0 - no secret key
+  "[curve]\n",
+
+  // 1 - no curve section
+  "\n",
+
+  // 2 - invalid base64 secret-key
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+8.8J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzqVA==\"\n",
+
+  // 3 - short secret-key (but valid base64)
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+828J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzq\n",
+
+  // 4 - long secret-key (but valid base64)
+  "[curve]\n"
+  "    secret-key = \"j+UF7qPPkehuwBz/DZjW4NE4lKcdXG+eM+828J30UwOr3vgDNB1IA+C/fauW2XnPdGVv730JGig3lAiRRYzqVGE=\n",
+
+};
+static const int badcerts_secret_count = sizeof (badcerts_secret)
+                                        / sizeof (badcerts_secret[0]);
+
+static const char *badcerts[] = {
+  // 0 - no public key
+  "[metadata]\n"
+  "[curve]\n",
+
+  // 1 - no metadata section
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/GoE7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKziiAg==\"\n",
+
+  // 2 - no curve section
+  "[metadata]\n",
+
+  // 3 - invalid base64 public-key
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4m.jnwbC/0gTYAG2d9yReTJwc=\"\n",
+
+  // 4 - short public-key (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJw==\"\n",
+
+  // 5 - long public-key (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwdh\"\n",
+
+  // 6 - invalid base64 signature
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/G.E7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKziiAg==\"\n",
+
+  // 6 - short signature (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/GoE7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKzii\"\n",
+
+  // 7 - long signature (but valid base64)
+  "[metadata]\n"
+  "[curve]\n"
+  "    public-key = \"/Q5g8sj5Hl4XUF9GKn4mNjnwbC/0gTYAG2d9yReTJwc=\"\n"
+  "    signature = \"lemKu7wjG/KpLFaOPVt+axUvMzXRf/GoE7vQJDPH7iePXwKrDmOLZ3uQq4qQATOUHRuSDerdWyM6qokyKziiAmE=\"\n",
+};
+static const int badcerts_count = sizeof (badcerts) / sizeof (badcerts[0]);
+
+void create_file_content (const char *path, const void *content, size_t size)
+{
+    FILE *fp = fopen (path, "w+");
+    if (!fp)
+        BAIL_OUT ("%s: fopen: %s", path, strerror (errno));
+    if (fwrite (content, size, 1, fp) != 1)
+        BAIL_OUT ("%s: fwrite: %s", path, strerror (errno));
+    if (fclose (fp) < 0)
+        BAIL_OUT ("%s: fclose: %s", path, strerror (errno));
+}
+
+bool check_public_file (const char *content)
+{
+    struct flux_sigcert *cert;
+    bool valid = false;
+    const char *name;
+
+    name = new_keypath ("test.pub");
+    create_file_content (name, content, strlen (content));
+
+    name = new_keypath ("test");
+    if ((cert = flux_sigcert_load (name, false))) {
+        flux_sigcert_destroy (cert);
+        valid = true;
+    }
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+    return valid;
+}
+
+bool check_secret_file (const char *content)
+{
+    struct flux_sigcert *cert;
+    bool valid = false;
+    const char *name;
+
+    name = new_keypath ("test.pub");
+    create_file_content (name, goodcert_pub, strlen (goodcert_pub));
+
+    name = new_keypath ("test");
+    create_file_content (name, content, strlen (content));
+
+    if ((cert = flux_sigcert_load (name, true))) {
+        flux_sigcert_destroy (cert);
+        valid = true;
+    }
+    cleanup_keypath ("test");
+    cleanup_keypath ("test.pub");
+    return valid;
+}
+
+void test_badcert (void)
+{
+    int i;
+
+    ok (check_public_file (goodcert_pub) == true,
+        "sanity check good public cert");
+    ok (check_secret_file (goodcert) == true,
+        "sanity check good secret cert");
+
+    for (i = 0; i < badcerts_count; i++) {
+        ok (check_public_file (badcerts[i]) == false,
+            "flux_sigcert_load failed on bad public cert %d", i);
+    }
+    for (i = 0; i < badcerts_secret_count; i++) {
+        ok (check_secret_file (badcerts_secret[i]) == false,
+            "flux_sigcert_load failed on bad secret cert %d", i);
+    }
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
+    new_scratchdir ();
 
     test_meta ();
     test_load_store ();
     test_sign_verify();
     test_json_load_dump_sign ();
     test_json_load_dump ();
-
     test_corner ();
+    test_sign_cert ();
+    test_badcert ();
 
+    cleanup_scratchdir ();
     done_testing ();
 }
 
 /*
  * vi: ts=4 sw=4 expandtab
  */
-

@@ -20,7 +20,9 @@ libflux_security_la_SOURCES = \
 
 TESTS = test_sigcert.t
 
-check_PROGRAMS = $(TESTS)
+check_PROGRAMS = \
+	test_keygen \
+	$(TESTS)
 
 TEST_EXTENSIONS = .t
 T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
@@ -38,3 +40,7 @@ test_ldadd = \
 test_sigcert_t_SOURCES = test/sigcert.c
 test_sigcert_t_LDADD = $(test_ldadd)
 test_sigcert_t_CPPFLAGS = $(test_cppflags)
+
+test_keygen_SOURCES = test/keygen.c
+test_keygen_LDADD = $(test_ldadd)
+test_keygen_CPPFLAGS = $(test_cppflags)
