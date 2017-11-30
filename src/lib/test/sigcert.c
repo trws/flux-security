@@ -142,7 +142,7 @@ void test_load_store (void)
         "flux_sigcert_meta_setts time=now");
     ok (flux_sigcert_store (cert, name) == 0,
         "flux_sigcert_store test, test.pub worked");
-    ok ((cert2 = flux_sigcert_load (name)) != NULL,
+    ok ((cert2 = flux_sigcert_load (name, true)) != NULL,
         "flux_sigcert_load test worked");
     diag_cert ("cert", cert);
     diag_cert ("cert2", cert2);
@@ -163,8 +163,8 @@ void test_load_store (void)
 
     /* Load just the public key and verify keys are different
      */
-    name = new_keypath ("test.pub");
-    ok ((cert2 = flux_sigcert_load (name)) != NULL,
+    name = new_keypath ("test");
+    ok ((cert2 = flux_sigcert_load (name, false)) != NULL,
         "flux_sigcert_load test.pub worked");
     ok (flux_sigcert_equal (cert, cert2) == false,
         "pub cert differs from secret one");
@@ -189,7 +189,7 @@ void test_load_store (void)
         BAIL_OUT ("chdir %s: %s", scratch, strerror (errno));
     ok (flux_sigcert_store (cert, "foo") == 0,
         "flux_sigcert_store works with relative path");
-    cert2 = flux_sigcert_load ("foo");
+    cert2 = flux_sigcert_load ("foo", true);
     ok (cert2 != NULL,
         "flux_sigcert_load works with relative path");
     if (chdir (cwd) < 0)
@@ -308,9 +308,8 @@ void test_json_load_dump (void)
 
     new_scratchdir ();
 
-    /* Store a cert to test, test.pub, then load cert_pub from
-     * test.pub so we have one containing only the public key.
-     * (json codec never transfers the secret key)
+    /* Store a cert to test, test.pub, then load cert_pub with
+     * only the public key.
      */
     name = new_keypath ("test");
     if (!(cert = flux_sigcert_create ()))
@@ -327,8 +326,7 @@ void test_json_load_dump (void)
         "flux_sigcert_meta_setb time=now");
     if (flux_sigcert_store (cert, name) < 0)
         BAIL_OUT ("flux_sigcert_store");
-    name = new_keypath ("test.pub");
-    ok ((cert_pub = flux_sigcert_load (name)) != NULL,
+    ok ((cert_pub = flux_sigcert_load (name, false)) != NULL,
         "flux_sigcert_load test.pub worked");
 
     /* Dump cert_pub to json string, then load cert2 from
@@ -385,10 +383,10 @@ void test_corner (void)
     ok (flux_sigcert_store (NULL, "foo") < 0 && errno == EINVAL,
         "flux_sigcert_store cert=NULL fails with EINVAL");
     errno = 0;
-    ok (flux_sigcert_load (NULL) == NULL && errno == EINVAL,
+    ok (flux_sigcert_load (NULL, true) == NULL && errno == EINVAL,
         "flux_sigcert_load name=NULL fails with EINVAL");
     errno = 0;
-    ok (flux_sigcert_load ("/noexist") == NULL && errno == ENOENT,
+    ok (flux_sigcert_load ("/noexist", true) == NULL && errno == ENOENT,
         "flux_sigcert_load name=/noexist fails with ENOENT");
     ok (flux_sigcert_equal (NULL, cert) == false,
         "flux_sigcert_load cert1=NULL returns false");

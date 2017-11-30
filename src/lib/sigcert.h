@@ -8,8 +8,8 @@
 /* Certificate class for signing/verification.
  *
  * Keys can be loaded/stored from TOML based certificate files.
- * The "secret" version of the certificate contains everything.
- * The "public" version of the certificate contains all but private keys.
+ * The "secret" file only contains the secret-key.
+ * The "public" file contains the public-key, metadata and signature.
  * The public version is distinguished by a .pub extension (like ssh keys).
  */
 
@@ -27,9 +27,10 @@ void flux_sigcert_destroy (struct flux_sigcert *cert);
  */
 struct flux_sigcert *flux_sigcert_create (void);
 
-/* Load cert from file 'name', falling back to 'name.pub'.
+/* Load cert from file 'name.pub'.
+ * If secret=true, load secret-key from 'name' also.
  */
-struct flux_sigcert *flux_sigcert_load (const char *name);
+struct flux_sigcert *flux_sigcert_load (const char *name, bool secret);
 
 /* Store cert to 'name' and 'name.pub'.
  */

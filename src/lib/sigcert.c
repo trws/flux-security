@@ -494,11 +494,24 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
     return fp;
 }
 
-/* Write cert contents to 'fp' in TOML format.
- * If secret=true, include secret key.
+/* Write secret-key (only) to 'fp' in TOML format.
  */
-static int sigcert_fwrite (const struct flux_sigcert *cert,
-                           FILE *fp, bool secret)
+static int sigcert_fwrite_secret (const struct flux_sigcert *cert, FILE *fp)
+{
+    secret_base64_t seckey;
+
+    // [curve]
+    if (fprintf (fp, "[curve]\n") < 0)
+        return -1;
+    sigcert_base64_encode_secret (cert->secret_key, seckey);
+    if (fprintf (fp, "    secret-key = \"%s\"\n", seckey) < 0)
+        return -1;
+    return 0;
+}
+
+/* Write public cert contents (not secret-key) to 'fp' in TOML format.
+ */
+static int sigcert_fwrite_public (const struct flux_sigcert *cert, FILE *fp)
 {
     void *iter;
 
@@ -562,12 +575,6 @@ static int sigcert_fwrite (const struct flux_sigcert *cert,
     if (fprintf (fp, "    public-key = \"%s\"\n", pubkey) < 0)
         goto error;
 
-    if (secret) {
-        secret_base64_t seckey;
-        sigcert_base64_encode_secret (cert->secret_key, seckey);
-        if (fprintf (fp, "    secret-key = \"%s\"\n", seckey) < 0)
-            goto error;
-    }
     if (cert->signature_valid) {
         sign_base64_t sign;
         sigcert_base64_encode_sign (cert->signature, sign);
@@ -582,29 +589,29 @@ error:
 int flux_sigcert_store (const struct flux_sigcert *cert, const char *name)
 {
     FILE *fp = NULL;
-    const int pubsz = PATH_MAX + 1;
-    char name_pub[pubsz];
+    char name_pub[PATH_MAX + 1];
     int saved_errno;
 
-    if (!cert || !cert->secret_valid || !name || strlen (name) == 0) {
+    if (!cert || !name || strlen (name) == 0) {
         errno = EINVAL;
         goto error;
     }
-    if (snprintf (name_pub, pubsz, "%s.pub", name) >= pubsz)
+    if (snprintf (name_pub, PATH_MAX + 1, "%s.pub", name) >= PATH_MAX + 1)
         goto error;
     if (!(fp = fopen_mode (name_pub, 0644)))
         goto error;
-    if (sigcert_fwrite (cert, fp, false) < 0)
+    if (sigcert_fwrite_public (cert, fp) < 0)
         goto error;
     if (fclose (fp) < 0)
         goto error;
-
-    if (!(fp = fopen_mode (name, 0600)))
-        goto error;
-    if (sigcert_fwrite (cert, fp, true) < 0)
-        goto error;
-    if (fclose (fp) < 0)
-        goto error;
+    if (cert->secret_valid) {
+        if (!(fp = fopen_mode (name, 0600)))
+            goto error;
+        if (sigcert_fwrite_secret (cert, fp) < 0)
+            goto error;
+        if (fclose (fp) < 0)
+            goto error;
+    }
     return 0;
 error:
     saved_errno = errno;
@@ -712,10 +719,35 @@ done:
     return rc;
 }
 
-/* Read cert contents from 'fp' in TOML format.
- * If secret=true, include secret key.
+/* Read in secret-key.
  */
-static int sigcert_fread (struct flux_sigcert *cert, FILE *fp, bool secret)
+static int sigcert_fread_secret (struct flux_sigcert *cert, FILE *fp)
+{
+    toml_table_t *cert_table = NULL;
+    toml_table_t *curve_table;
+    const char *raw;
+    char errbuf[200];
+
+    if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
+        goto inval;
+    if (!(curve_table = toml_table_in (cert_table, "curve")))
+        goto inval;
+    if (!(raw = toml_raw_in (curve_table, "secret-key")))
+        goto inval;
+    if (parse_toml_secret_key (raw, cert->secret_key) < 0)
+        goto inval;
+    cert->secret_valid = true;
+    toml_free (cert_table);
+    return 0;
+inval:
+    toml_free (cert_table);
+    errno = EINVAL;
+    return -1;
+}
+
+/* Read public cert contents from 'fp' in TOML format.
+ */
+static int sigcert_fread_public (struct flux_sigcert *cert, FILE *fp)
 {
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
@@ -745,13 +777,6 @@ static int sigcert_fread (struct flux_sigcert *cert, FILE *fp, bool secret)
         goto inval;
     if (parse_toml_public_key (raw, cert->public_key) < 0)
         goto inval;
-    if (secret) {
-        if ((raw = toml_raw_in (curve_table, "secret-key"))) { // optional
-            if (parse_toml_secret_key (raw, cert->secret_key) < 0)
-                goto inval;
-            cert->secret_valid = true;
-        }
-    }
     if ((raw = toml_raw_in (curve_table, "signature"))) { // optional
         if (parse_toml_signature (raw, cert->signature) < 0)
             goto inval;
@@ -765,36 +790,35 @@ inval:
     return -1;
 }
 
-struct flux_sigcert *flux_sigcert_load (const char *name)
+struct flux_sigcert *flux_sigcert_load (const char *name, bool secret)
 {
     FILE *fp = NULL;
-    const int pubsz = PATH_MAX + 1;
-    char name_pub[pubsz];
+    char name_pub[PATH_MAX + 1];
     int saved_errno;
     struct flux_sigcert *cert = NULL;
 
     if (!name)
         goto inval;
-    if (snprintf (name_pub, pubsz, "%s.pub", name) >= pubsz)
+    if (snprintf (name_pub, PATH_MAX + 1, "%s.pub", name) >= PATH_MAX + 1)
         goto inval;
     if (!(cert = sigcert_create ()))
         return NULL;
-
-    /* Try the secret cert file first.
-     * If that doesn't work, try the public cert file.
-     */
-    if ((fp = fopen (name, "r"))) {
-        if (sigcert_fread (cert, fp, true) < 0)
-            goto error;
-    }
-    else if ((fp = fopen (name_pub, "r"))) {
-        if (sigcert_fread (cert, fp, false) < 0)
-            goto error;
-    }
-    else
+    // name.pub - public
+    if (!(fp = fopen (name_pub, "r")))
+        goto error;
+    if (sigcert_fread_public (cert, fp) < 0)
         goto error;
     if (fclose (fp) < 0)
         goto error;
+    // name - secret
+    if (secret) {
+        if (!(fp = fopen (name, "r")))
+            goto error;
+        if (sigcert_fread_secret (cert, fp) < 0)
+            goto error;
+        if (fclose (fp) < 0)
+            goto error;
+    }
     return cert;
 inval:
     errno = EINVAL;
