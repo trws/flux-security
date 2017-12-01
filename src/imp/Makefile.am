@@ -6,10 +6,32 @@ AM_LDFLAGS = \
 	$(CODE_COVERAGE_LIBS)
 
 AM_CPPFLAGS = \
-	$(CODE_COVERAGE_CPPFLAGS)
+	$(CODE_COVERAGE_CPPFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src
 
 libexec_PROGRAMS = \
 	flux-imp
 
 flux_imp_SOURCES = \
 	imp.c
+
+TESTS = \
+	test_imp_log.t
+check_PROGRAMS = \
+	$(TESTS)
+
+test_ldadd = \
+	$(top_builddir)/src/libutil/libutil.la \
+	$(top_builddir)/src/libtap/libtap.la
+
+TEST_EXTENSIONS = .t
+T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
+	$(top_srcdir)/config/tap-driver.sh
+
+test_imp_log_t_SOURCES =  \
+	test/imp_log.c \
+	imp_log.c \
+	imp_log.h
+
+test_imp_log_t_LDADD = $(test_ldadd)
