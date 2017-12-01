@@ -19,7 +19,9 @@ libutil_la_SOURCES = \
 	hash.c \
 	hash.h
 
-TESTS = test_base64.t
+TESTS = \
+	test_base64.t \
+	test_hash.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -37,3 +39,7 @@ T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 test_base64_t_SOURCES = test/base64_test.c
 test_base64_t_CPPFLAGS = $(test_cppflags)
 test_base64_t_LDADD = $(test_ldadd)
+
+test_hash_t_SOURCES = test/hash.c
+test_hash_t_CPPFLAGS = $(test_cppflags)
+test_hash_t_LDADD = $(test_ldadd)
