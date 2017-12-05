@@ -13,8 +13,13 @@ AM_CPPFLAGS = \
 libexec_PROGRAMS = \
 	flux-imp
 
+flux_imp_LDADD = \
+	$(top_builddir)/src/libutil/libutil.la
+
 flux_imp_SOURCES = \
-	imp.c
+	imp.c \
+	imp_log.h \
+	imp_log.c
 
 TESTS = \
 	test_imp_log.t
