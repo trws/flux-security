@@ -28,9 +28,30 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-int main ()
+#include "imp_log.h"
+
+/*  Static prototypes:
+ */
+static void print_version (void);
+static int  log_stderr (int level, const char *str, void *arg);
+
+int main (int argc, char *argv[])
 {
+    imp_openlog ();
+
+    if (imp_log_add ("stderr", IMP_LOG_INFO, log_stderr, NULL) < 0) {
+        fprintf (stderr, "flux-imp: Failed to initialize logging. Aborting.\n");
+        exit (1);
+    }
+
+    if (argc < 2)
+        imp_die (1, "IMP requires a command, master!");
+
+    if (argc == 2 && strncmp (argv[1], "version", 7) == 0)
+        print_version ();
+
     /*  Configuration:
      */
     // Skip.
@@ -46,8 +67,26 @@ int main ()
     /*  Parse command line and run subcommand
      */
     // Skip.
+
+    imp_closelog ();
     exit (0);
 }
+
+static void print_version ()
+{
+    printf ("flux-imp v%s\n", PACKAGE_VERSION);
+}
+
+static int log_stderr (int level, const char *str,
+                       void *arg __attribute__ ((unused)))
+{
+    if (level == IMP_LOG_INFO)
+        fprintf (stderr, "flux-imp: %s\n", str);
+    else
+        fprintf (stderr, "flux-imp: %s: %s\n", imp_log_strlevel (level), str);
+    return (0);
+}
+
 
 /*
  * vi: ts=4 sw=4 expandtab
