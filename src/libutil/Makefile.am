@@ -17,7 +17,9 @@ libutil_la_SOURCES = \
 	base64.h \
 	thread.h \
 	hash.c \
-	hash.h
+	hash.h \
+	tomltk.c \
+	tomltk.h
 
 TESTS = \
 	test_base64.t \
