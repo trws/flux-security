@@ -27,7 +27,8 @@ libutil_la_SOURCES = \
 TESTS = \
 	test_base64.t \
 	test_hash.t \
-	test_tomltk.t
+	test_tomltk.t \
+	test_cf.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -55,3 +56,7 @@ test_hash_t_LDADD = $(test_ldadd)
 test_tomltk_t_SOURCES = test/tomltk.c
 test_tomltk_t_CPPFLAGS = $(test_cppflags)
 test_tomltk_t_LDADD = $(test_ldadd)
+
+test_cf_t_SOURCES = test/cf.c
+test_cf_t_CPPFLAGS = $(test_cppflags)
+test_cf_t_LDADD = $(test_ldadd)
