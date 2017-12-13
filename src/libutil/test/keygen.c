@@ -36,21 +36,21 @@ void die (const char *fmt, ...)
  */
 void generate_cert (const char *target_path)
 {
-    struct flux_sigcert *cert;
+    struct sigcert *cert;
     time_t t;
 
-    if (!(cert = flux_sigcert_create ()))
-        die ("flux_sigcert_create");
+    if (!(cert = sigcert_create ()))
+        die ("sigcert_create");
     if (time (&t) == (time_t)-1)
         die ("time");
-    if (flux_sigcert_meta_setts (cert, "create-time", t) < 0)
-        die ("flux_sigcert_meta_setts");
-    if (flux_sigcert_meta_seti (cert, "userid", getuid ()) < 0)
-        die ("flux_sigcert_meta_seti");
+    if (sigcert_meta_setts (cert, "create-time", t) < 0)
+        die ("sigcert_meta_setts");
+    if (sigcert_meta_seti (cert, "userid", getuid ()) < 0)
+        die ("sigcert_meta_seti");
     fprintf (stderr, "keygen: updating %s\n", target_path);
-    if (flux_sigcert_store (cert, target_path) < 0)
-        die ("flux_sigcert_store");
-    flux_sigcert_destroy (cert);
+    if (sigcert_store (cert, target_path) < 0)
+        die ("sigcert_store");
+    sigcert_destroy (cert);
 }
 
 /* Sign cert at 'target_path' with cert at 'signer_path'.
@@ -58,51 +58,51 @@ void generate_cert (const char *target_path)
  */
 void sign_cert (const char *signer_path, const char *target_path)
 {
-    struct flux_sigcert *cert1;
-    struct flux_sigcert *cert2;
+    struct sigcert *cert1;
+    struct sigcert *cert2;
     time_t t;
     int64_t userid;
 
-    if (!(cert1 = flux_sigcert_load (signer_path, true)))
+    if (!(cert1 = sigcert_load (signer_path, true)))
         die ("load %s", signer_path);
-    if (!(cert2 = flux_sigcert_load (target_path, false)))
+    if (!(cert2 = sigcert_load (target_path, false)))
         die ("load %s", target_path);
 
-    if (flux_sigcert_meta_geti (cert1, "userid", &userid) < 0)
-        die ("flux_sigcert_meta_setts");
-    if (flux_sigcert_meta_seti (cert2, "ca-userid", userid) < 0)
-        die ("flux_sigcert_meta_setts");
+    if (sigcert_meta_geti (cert1, "userid", &userid) < 0)
+        die ("sigcert_meta_setts");
+    if (sigcert_meta_seti (cert2, "ca-userid", userid) < 0)
+        die ("sigcert_meta_setts");
     if (time (&t) == (time_t)-1)
         die ("time");
-    if (flux_sigcert_meta_setts (cert2, "ca-signed-time", t) < 0)
-        die ("flux_sigcert_meta_setts");
+    if (sigcert_meta_setts (cert2, "ca-signed-time", t) < 0)
+        die ("sigcert_meta_setts");
 
-    if (flux_sigcert_sign_cert (cert1, cert2) < 0)
-        die ("flux_sigcert_sign_cert");
+    if (sigcert_sign_cert (cert1, cert2) < 0)
+        die ("sigcert_sign_cert");
     fprintf (stderr, "keygen: updating %s\n", target_path);
-    if (flux_sigcert_store (cert2, target_path) < 0)
+    if (sigcert_store (cert2, target_path) < 0)
         die ("store %s", target_path);
-    flux_sigcert_destroy (cert1);
-    flux_sigcert_destroy (cert2);
+    sigcert_destroy (cert1);
+    sigcert_destroy (cert2);
 }
 
 /* Verify that cert at 'target_path' was signed by cert at 'signer_path'.
  */
 void verify_cert (const char *signer_path, const char *target_path)
 {
-    struct flux_sigcert *cert1;
-    struct flux_sigcert *cert2;
+    struct sigcert *cert1;
+    struct sigcert *cert2;
 
-    if (!(cert1 = flux_sigcert_load (signer_path, false)))
+    if (!(cert1 = sigcert_load (signer_path, false)))
         die ("load %s", signer_path);
-    if (!(cert2 = flux_sigcert_load (target_path, false)))
+    if (!(cert2 = sigcert_load (target_path, false)))
         die ("load %s", target_path);
-    if (flux_sigcert_verify_cert (cert1, cert2) < 0)
+    if (sigcert_verify_cert (cert1, cert2) < 0)
         fprintf (stderr, "signature verifcation failed\n");
     else
         fprintf (stderr, "signature verification succeeded\n");
-    flux_sigcert_destroy (cert1);
-    flux_sigcert_destroy (cert2);
+    sigcert_destroy (cert1);
+    sigcert_destroy (cert2);
 }
 
 void usage (void)
