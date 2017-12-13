@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <limits.h>
 
-// flags for cf_update
+// flags for cf_check
 enum {
     CF_STRICT = 1,     // parse error on unknown keys
     CF_ANYTAB = 2,     // allow unknown keys for tables only
@@ -26,6 +26,9 @@ enum cf_type {
 
 typedef void cf_t;
 
+/* cf_check option table consists of an array of struct cf_option
+ * elements, terminated by CF_OPTIONS_TABLE_END.
+ */
 struct cf_option {
     const char *key;
     enum cf_type type;
@@ -33,26 +36,50 @@ struct cf_option {
 };
 #define CF_OPTIONS_TABLE_END { NULL, 0, false }
 
+/* Error information is filled in by cf_update, cf_file, and cf_check.
+ * If filename is unavailable, it is set to empty string.
+ * If lineno is unavailable, it is set to -1.
+ * The errbuf is always valid after one of the above functions fails.
+ */
 struct cf_error {
     char filename[PATH_MAX + 1];
     int lineno;
     char errbuf[200];
 };
 
+/* Create a cf_t object of type CF_TABLE.  Destroy with cf_destroy().
+ */
 cf_t *cf_create (void);
 void cf_destroy (cf_t *cf);
+
+/* Copy a cf_t object.  Destroy with cf_destroy().
+ */
 cf_t *cf_copy (cf_t *cf);
+
+/* Get type of cf_t object.
+ */
 enum cf_type cf_typeof (cf_t *cf);
 
+/* Get cf_t object from table.  Do not free.
+ */
 cf_t *cf_get_in (cf_t *cf, const char *key);
+
+/* Get cf_t object from array.  Do not free.
+ */
 cf_t *cf_get_at (cf_t *cf, int index);
 
-int64_t cf_int64 (cf_t *cf);
-double cf_double (cf_t *cf);
-const char *cf_string (cf_t *cf);
-bool cf_bool (cf_t *cf);
-time_t cf_timestamp (cf_t *cf);
+/* Access object as a particular type.
+ * If wrong type or NULL cf, default value is returned.
+ */
+int64_t cf_int64 (cf_t *cf);        // default: 0
+double cf_double (cf_t *cf);        // default: 0.
+const char *cf_string (cf_t *cf);   // default: ""
+bool cf_bool (cf_t *cf);            // default: false
+time_t cf_timestamp (cf_t *cf);     // default: 0
 
+/* Get array size.
+ * If object is not an array, return 0.
+ */
 int cf_array_size (cf_t *cf);
 
 /* Update table 'cf' with info parsed from TOML 'buf' or 'filename'.
