@@ -30,7 +30,8 @@ TESTS = \
 	test_base64.t \
 	test_hash.t \
 	test_tomltk.t \
-	test_cf.t
+	test_cf.t \
+	test_kv.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -62,3 +63,7 @@ test_tomltk_t_LDADD = $(test_ldadd)
 test_cf_t_SOURCES = test/cf.c
 test_cf_t_CPPFLAGS = $(test_cppflags)
 test_cf_t_LDADD = $(test_ldadd)
+
+test_kv_t_SOURCES = test/kv.c
+test_kv_t_LDADD = $(test_ldadd)
+test_kv_t_CPPFLAGS = $(test_cppflags)
