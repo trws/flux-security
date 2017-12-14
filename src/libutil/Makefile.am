@@ -22,7 +22,9 @@ libutil_la_SOURCES = \
 	tomltk.c \
 	tomltk.h \
 	cf.c \
-	cf.h
+	cf.h \
+	kv.c \
+	kv.h
 
 TESTS = \
 	test_base64.t \
