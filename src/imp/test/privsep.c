@@ -30,6 +30,7 @@
 #include <sys/types.h>
 
 #include "imp_log.h"
+#include "sudosim.h"
 #include "privsep.h"
 
 #include "src/libtap/tap.h"
@@ -253,6 +254,9 @@ int main (void)
      */
     imp_openlog ();
     imp_log_add ("diag", IMP_LOG_DEBUG, log_diag, NULL);
+
+    if (sudo_simulate_setuid () < 0)
+        BAIL_OUT ("Failed to simulate setuid under sudo");
 
     if (geteuid () == getuid ()) {
         plan (SKIP_ALL, "Privsep test needs to be run setuid");
