@@ -40,8 +40,8 @@
 #include <jansson.h>
 
 #include "src/libtomlc99/toml.h"
-#include "src/libutil/base64.h"
-#include "src/libutil/tomltk.h"
+#include "base64.h"
+#include "tomltk.h"
 #include "sigcert.h"
 
 /* Define some handy types for fixed length keys and their base64 encodings.
@@ -66,7 +66,7 @@ typedef char sign_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_BYTES)];
 
 
 #define FLUX_SIGCERT_MAGIC 0x2349c0ed
-struct flux_sigcert {
+struct sigcert {
     int magic;
 
     public_t public_key;
@@ -79,7 +79,7 @@ struct flux_sigcert {
     bool signature_valid;
 };
 
-void flux_sigcert_destroy (struct flux_sigcert *cert)
+void sigcert_destroy (struct sigcert *cert)
 {
     if (cert) {
         int saved_errno = errno;
@@ -98,9 +98,9 @@ void flux_sigcert_destroy (struct flux_sigcert *cert)
  * Checking here should be sufficient since there can be no calls from
  * this module without certs, and all certs are created here.
  */
-struct flux_sigcert *sigcert_create (void)
+static struct sigcert *sigcert_alloc (void)
 {
-    struct flux_sigcert *cert;
+    struct sigcert *cert;
     static bool sodium_initialized = false;
 
     if (!sodium_initialized) {
@@ -119,30 +119,30 @@ struct flux_sigcert *sigcert_create (void)
     }
     return cert;
 error:
-    flux_sigcert_destroy (cert);
+    sigcert_destroy (cert);
     return NULL;
 }
 
-struct flux_sigcert *flux_sigcert_create (void)
+struct sigcert *sigcert_create (void)
 {
-    struct flux_sigcert *cert;
+    struct sigcert *cert;
 
-    if (!(cert = sigcert_create ()))
+    if (!(cert = sigcert_alloc ()))
         goto error;
     if (crypto_sign_keypair (cert->public_key, cert->secret_key) < 0)
         goto error;
     cert->secret_valid = true;
     return cert;
 error:
-    flux_sigcert_destroy (cert);
+    sigcert_destroy (cert);
     return NULL;
 }
 
 /* Don't allow '.' in a key or when it's written out to TOML
  * it will look like TOML hierarchy.
  */
-int flux_sigcert_meta_sets (struct flux_sigcert *cert,
-                            const char *key, const char *s)
+int sigcert_meta_sets (struct sigcert *cert,
+                       const char *key, const char *s)
 {
     json_t *val;
 
@@ -161,8 +161,8 @@ nomem:
     return -1;
 }
 
-int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
-                            const char *key, const char **sp)
+int sigcert_meta_gets (const struct sigcert *cert,
+                       const char *key, const char **sp)
 {
     json_t *val;
     const char *s;
@@ -183,8 +183,8 @@ int flux_sigcert_meta_gets (const struct flux_sigcert *cert,
     return 0;
 }
 
-int flux_sigcert_meta_seti (struct flux_sigcert *cert,
-                            const char *key, int64_t i)
+int sigcert_meta_seti (struct sigcert *cert,
+                       const char *key, int64_t i)
 {
     json_t *val;
 
@@ -203,8 +203,8 @@ nomem:
     return -1;
 }
 
-int flux_sigcert_meta_geti (const struct flux_sigcert *cert,
-                            const char *key, int64_t *ip)
+int sigcert_meta_geti (const struct sigcert *cert,
+                       const char *key, int64_t *ip)
 {
     json_t *val;
 
@@ -224,8 +224,8 @@ int flux_sigcert_meta_geti (const struct flux_sigcert *cert,
     return 0;
 }
 
-int flux_sigcert_meta_setd (struct flux_sigcert *cert,
-                            const char *key, double d)
+int sigcert_meta_setd (struct sigcert *cert,
+                       const char *key, double d)
 {
     json_t *val;
 
@@ -244,8 +244,8 @@ nomem:
     return -1;
 }
 
-int flux_sigcert_meta_getd (const struct flux_sigcert *cert,
-                            const char *key, double *dp)
+int sigcert_meta_getd (const struct sigcert *cert,
+                       const char *key, double *dp)
 {
     json_t *val;
 
@@ -265,8 +265,8 @@ int flux_sigcert_meta_getd (const struct flux_sigcert *cert,
     return 0;
 }
 
-int flux_sigcert_meta_setb (struct flux_sigcert *cert,
-                            const char *key, bool b)
+int sigcert_meta_setb (struct sigcert *cert,
+                       const char *key, bool b)
 {
     json_t *val;
 
@@ -286,8 +286,8 @@ nomem:
     return -1;
 }
 
-int flux_sigcert_meta_getb (const struct flux_sigcert *cert,
-                            const char *key, bool *bp)
+int sigcert_meta_getb (const struct sigcert *cert,
+                       const char *key, bool *bp)
 {
     json_t *val;
 
@@ -314,8 +314,8 @@ int flux_sigcert_meta_getb (const struct flux_sigcert *cert,
  * metadata is strictly a flat list, this cannot be confused with any
  * of the other metadata types.
  */
-int flux_sigcert_meta_setts (struct flux_sigcert *cert,
-                             const char *key, time_t t)
+int sigcert_meta_setts (struct sigcert *cert,
+                        const char *key, time_t t)
 {
     json_t *val;
 
@@ -332,8 +332,8 @@ int flux_sigcert_meta_setts (struct flux_sigcert *cert,
     return 0;
 }
 
-int flux_sigcert_meta_getts (const struct flux_sigcert *cert,
-                             const char *key, time_t *tp)
+int sigcert_meta_getts (const struct sigcert *cert,
+                        const char *key, time_t *tp)
 {
     json_t *val;
 
@@ -464,7 +464,7 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
 
 /* Write secret-key (only) to 'fp' in TOML format.
  */
-static int sigcert_fwrite_secret (const struct flux_sigcert *cert, FILE *fp)
+static int sigcert_fwrite_secret (const struct sigcert *cert, FILE *fp)
 {
     secret_base64_t seckey;
 
@@ -479,7 +479,7 @@ static int sigcert_fwrite_secret (const struct flux_sigcert *cert, FILE *fp)
 
 /* Write public cert contents (not secret-key) to 'fp' in TOML format.
  */
-static int sigcert_fwrite_public (const struct flux_sigcert *cert, FILE *fp)
+static int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
 {
     void *iter;
 
@@ -554,7 +554,7 @@ error:
     return -1;
 }
 
-int flux_sigcert_store (const struct flux_sigcert *cert, const char *name)
+int sigcert_store (const struct sigcert *cert, const char *name)
 {
     FILE *fp = NULL;
     char name_pub[PATH_MAX + 1];
@@ -634,7 +634,7 @@ done:
     return rc;
 }
 
-static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
+static int parse_toml_meta_set (const char *raw, struct sigcert *cert,
                                 const char *key)
 {
     char *s = NULL;
@@ -645,26 +645,26 @@ static int parse_toml_meta_set (const char *raw, struct flux_sigcert *cert,
     toml_timestamp_t ts;
 
     if (toml_rtos (raw, &s) == 0) {
-        if (flux_sigcert_meta_sets (cert, key, s) < 0)
+        if (sigcert_meta_sets (cert, key, s) < 0)
             goto done;
     }
     else if (toml_rtob (raw, &b) == 0) {
-        if (flux_sigcert_meta_setb (cert, key, b) < 0)
+        if (sigcert_meta_setb (cert, key, b) < 0)
             goto done;
     }
     else if (toml_rtoi (raw, &i) == 0) {
-        if (flux_sigcert_meta_seti (cert, key, i) < 0)
+        if (sigcert_meta_seti (cert, key, i) < 0)
             goto done;
     }
     else if (toml_rtod (raw, &d) == 0) {
-        if (flux_sigcert_meta_setd (cert, key, d) < 0)
+        if (sigcert_meta_setd (cert, key, d) < 0)
             goto done;
     }
     else if (toml_rtots (raw, &ts) == 0) {
         time_t t;
         if (tomltk_ts_to_epoch (&ts, &t) < 0)
             goto done;
-        if (flux_sigcert_meta_setts (cert, key, t) < 0)
+        if (sigcert_meta_setts (cert, key, t) < 0)
             goto done;
     }
     else
@@ -677,7 +677,7 @@ done:
 
 /* Read in secret-key.
  */
-static int sigcert_fread_secret (struct flux_sigcert *cert, FILE *fp)
+static int sigcert_fread_secret (struct sigcert *cert, FILE *fp)
 {
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
@@ -703,7 +703,7 @@ inval:
 
 /* Read public cert contents from 'fp' in TOML format.
  */
-static int sigcert_fread_public (struct flux_sigcert *cert, FILE *fp)
+static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
 {
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
@@ -746,18 +746,18 @@ inval:
     return -1;
 }
 
-struct flux_sigcert *flux_sigcert_load (const char *name, bool secret)
+struct sigcert *sigcert_load (const char *name, bool secret)
 {
     FILE *fp = NULL;
     char name_pub[PATH_MAX + 1];
     int saved_errno;
-    struct flux_sigcert *cert = NULL;
+    struct sigcert *cert = NULL;
 
     if (!name)
         goto inval;
     if (snprintf (name_pub, PATH_MAX + 1, "%s.pub", name) >= PATH_MAX + 1)
         goto inval;
-    if (!(cert = sigcert_create ()))
+    if (!(cert = sigcert_alloc ()))
         return NULL;
     // name.pub - public
     if (!(fp = fopen (name_pub, "r")))
@@ -782,7 +782,7 @@ error:
     saved_errno = errno;
     if (fp)
         (void)fclose (fp);
-    flux_sigcert_destroy (cert);
+    sigcert_destroy (cert);
     errno = saved_errno;
     return NULL;
 }
@@ -816,8 +816,8 @@ static int sigcert_pack_signature (const sign_t sign, json_t *obj)
  * but changing it could make certs that were signed before the change fail
  * verification!
  */
-static char *sigcert_json_dumps (const struct flux_sigcert *cert,
-                                 bool signature)
+static char *sigcert_json_dumps_flags (const struct sigcert *cert,
+                                       bool signature)
 {
     json_t *obj = NULL;
     public_base64_t pubkey;
@@ -854,16 +854,16 @@ error:
     return NULL;
 }
 
-char *flux_sigcert_json_dumps (const struct flux_sigcert *cert)
+char *sigcert_json_dumps (const struct sigcert *cert)
 {
-    return sigcert_json_dumps (cert, true);
+    return sigcert_json_dumps_flags (cert, true);
 }
 
-struct flux_sigcert *flux_sigcert_json_loads (const char *s)
+struct sigcert *sigcert_json_loads (const char *s)
 {
     json_t *obj = NULL;
     json_t *curve, *sig;
-    struct flux_sigcert *cert = NULL;
+    struct sigcert *cert = NULL;
     const char *pub;
     int saved_errno;
 
@@ -871,7 +871,7 @@ struct flux_sigcert *flux_sigcert_json_loads (const char *s)
         errno = EINVAL;
         return NULL;
     }
-    if (!(cert = sigcert_create ()))
+    if (!(cert = sigcert_alloc ()))
         return NULL;
     json_decref (cert->meta); // we create cert->meta from scratch below
     cert->meta = NULL;
@@ -908,13 +908,13 @@ struct flux_sigcert *flux_sigcert_json_loads (const char *s)
 error:
     saved_errno = errno;
     json_decref (obj);
-    flux_sigcert_destroy (cert);
+    sigcert_destroy (cert);
     errno = saved_errno;
     return NULL;
 }
 
-bool flux_sigcert_equal (const struct flux_sigcert *cert1,
-                         const struct flux_sigcert *cert2)
+bool sigcert_equal (const struct sigcert *cert1,
+                    const struct sigcert *cert2)
 {
     if (!cert1 || !cert2)
         return false;
@@ -933,8 +933,8 @@ bool flux_sigcert_equal (const struct flux_sigcert *cert1,
     return true;
 }
 
-char *flux_sigcert_sign (const struct flux_sigcert *cert,
-                         uint8_t *buf, int len)
+char *sigcert_sign (const struct sigcert *cert,
+                    uint8_t *buf, int len)
 {
     sign_t sig;
     sign_base64_t sig_base64;
@@ -951,8 +951,8 @@ char *flux_sigcert_sign (const struct flux_sigcert *cert,
     return strdup (sig_base64);
 }
 
-int flux_sigcert_verify (const struct flux_sigcert *cert,
-                         const char *sig_base64, uint8_t *buf, int len)
+int sigcert_verify (const struct sigcert *cert,
+                    const char *sig_base64, uint8_t *buf, int len)
 {
     sign_t sig;
 
@@ -973,8 +973,8 @@ int flux_sigcert_verify (const struct flux_sigcert *cert,
  * Dump cert2 as JSON in a repeatable way, excluding secret + signature,
  * sign with cert1.  Add 'signature' attribute to [curve] stanza.
  */
-int flux_sigcert_sign_cert (const struct flux_sigcert *cert1,
-                            struct flux_sigcert *cert2)
+int sigcert_sign_cert (const struct sigcert *cert1,
+                       struct sigcert *cert2)
 {
     char *s;
     int rc;
@@ -983,7 +983,7 @@ int flux_sigcert_sign_cert (const struct flux_sigcert *cert1,
         errno = EINVAL;
         return -1;
     }
-    if (!(s = sigcert_json_dumps (cert2, false)))
+    if (!(s = sigcert_json_dumps_flags (cert2, false)))
         return -1;
     rc = crypto_sign_detached (cert2->signature, NULL,
                                (uint8_t *)s, strlen (s),
@@ -997,8 +997,8 @@ int flux_sigcert_sign_cert (const struct flux_sigcert *cert1,
     return 0;
 }
 
-int flux_sigcert_verify_cert (const struct flux_sigcert *cert1,
-                              const struct flux_sigcert *cert2)
+int sigcert_verify_cert (const struct sigcert *cert1,
+                         const struct sigcert *cert2)
 {
     char *s;
     int rc;
@@ -1007,7 +1007,7 @@ int flux_sigcert_verify_cert (const struct flux_sigcert *cert1,
         errno = EINVAL;
         return -1;
     }
-    if (!(s = sigcert_json_dumps (cert2, false)))
+    if (!(s = sigcert_json_dumps_flags (cert2, false)))
         return -1;
     rc = crypto_sign_verify_detached (cert2->signature,
                                       (uint8_t *)s, strlen (s),
