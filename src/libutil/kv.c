@@ -117,7 +117,7 @@ static int kv_expand (struct kv *kv, int needsz)
 
 static bool valid_key (const char *key)
 {
-    if (!key || *key == '\0' || strlen (key) > KV_MAX_KEY || strchr (key, '='))
+    if (!key || *key == '\0')
         return false;
     return true;
 }
@@ -125,15 +125,33 @@ static bool valid_key (const char *key)
 static const char *kv_find (const struct kv *kv, const char *key)
 {
     const char *entry;
-    kv_keybuf_t keybuf;
 
     entry = kv_entry_first (kv);
     while (entry) {
-        if (!strcmp (key, kv_entry_key (entry, keybuf)))
+        if (!strcmp (key, kv_entry_key (entry)))
             return entry;
         entry = kv_entry_next (kv, entry);
     }
     return NULL;
+}
+
+/* Return length, not to exceed maxlen, of entry consisting of key\0value\0
+ * Return -1 on invalid entry.
+ */
+static int entry_length (const char *entry, int maxlen)
+{
+    int keylen;
+    int vallen;
+
+    keylen = strnlen (entry, maxlen);
+    if (keylen == 0 || keylen == maxlen)
+        return -1;
+    entry += keylen + 1;
+    maxlen -= keylen + 1;
+    vallen = strnlen (entry, maxlen);
+    if (vallen == 0 || vallen == maxlen)
+        return -1;
+    return keylen + vallen + 2;
 }
 
 int kv_delete (struct kv *kv, const char *key)
@@ -151,7 +169,8 @@ int kv_delete (struct kv *kv, const char *key)
         return -1;
     }
     entry_offset = entry - kv->buf;
-    entry_len = strlen (entry) + 1;
+    entry_len = entry_length (entry, kv->len - entry_offset);
+    assert (entry_len >= 0);
     memmove (kv->buf + entry_offset,
              kv->buf + entry_offset + entry_len,
              kv->len - entry_offset - entry_len);
@@ -161,8 +180,6 @@ int kv_delete (struct kv *kv, const char *key)
 
 int kv_put (struct kv *kv, const char *key, const char *val)
 {
-    int needsz;
-
     if (!kv || !valid_key (key) || !val) {
         errno = EINVAL;
         return -1;
@@ -171,13 +188,14 @@ int kv_put (struct kv *kv, const char *key, const char *val)
         if (errno != ENOENT)
             return -1;
     }
-    needsz = strlen (key) + strlen (val) + 2; // key=val\0
-    if (kv_expand (kv, needsz) < 0)
+    int keylen = strlen (key);
+    int vallen = strlen (val);
+    if (kv_expand (kv, keylen + vallen + 2) < 0) // key\0val\0
         return -1;
-    strcpy (kv->buf + kv->len, key);
-    strcat (kv->buf + kv->len, "=");
-    strcat (kv->buf + kv->len, val);
-    kv->len += needsz;
+    strncpy (&kv->buf[kv->len], key, keylen + 1);
+    kv->len += keylen + 1;
+    strncpy (&kv->buf[kv->len], val, vallen + 1);
+    kv->len += vallen + 1;
     return 0;
 }
 
@@ -210,14 +228,16 @@ int kv_putf (struct kv *kv, const char *key, const char *fmt, ...)
 
 const char *kv_entry_next (const struct kv *kv, const char *entry)
 {
-    const char *next;
+    int entry_len;
+    int entry_offset;
 
     if (!kv || !entry || entry < kv->buf || entry > kv->buf + kv->len)
         return NULL;
-    next = entry + strlen (entry) + 1;
-    if (next >= kv->buf + kv->len)
+    entry_offset = entry - kv->buf;
+    entry_len = entry_length (entry, kv->len - entry_offset);
+    if (entry_len < 0 || entry_offset + entry_len == kv->len)
         return NULL;
-    return next;
+    return entry + entry_len;
 }
 
 const char *kv_entry_first (const struct kv *kv)
@@ -229,23 +249,14 @@ const char *kv_entry_first (const struct kv *kv)
 
 const char *kv_entry_val (const char *entry)
 {
-    char *delim;
-
-    if (!entry || !(delim = strchr (entry, '=')))
+    if (!entry)
         return NULL;
-    return delim + 1;
+    return entry + strlen (entry) + 1;
 }
 
-const char *kv_entry_key (const char *entry, kv_keybuf_t keybuf)
+const char *kv_entry_key (const char *entry)
 {
-    if (!entry || !keybuf)
-        return NULL;
-    char *delim = strchr (entry, '=');
-    assert (delim != NULL);
-    assert (delim - entry <= KV_MAX_KEY);
-    strncpy (keybuf, entry, delim - entry);
-    keybuf[delim - entry] = '\0';
-    return keybuf;
+    return entry;
 }
 
 int kv_get (const struct kv *kv, const char *key, const char **val)
@@ -284,26 +295,39 @@ int kv_getf (const struct kv *kv, const char *key, const char *fmt, ...)
 }
 
 /* Validate a just-decoded kv buffer.
- * Ensure that it is properly terminated and contains no entries with
- * missing delimiters or invalid keys.
  */
 static int kv_check_integrity (struct kv *kv)
 {
+    int nullcount;
+    int i;
     const char *entry;
 
+    /* properly terminated
+     */
     if (kv->len > 0 && kv->buf[kv->len - 1] != '\0')
         goto inval;
+
+    /* even number of nulls
+     */
+    nullcount = 0;
+    for (i = 0; i < kv->len; i++) {
+        if (kv->buf[i] == '\0')
+            nullcount++;
+    }
+    if (nullcount % 2 != 0)
+        goto inval;
+
+    /* nonzero key and val lengths
+     */
     entry = kv_entry_first (kv);
     while (entry) {
-        const char *delim = strchr (entry, '=');
-        if (!delim)
-            goto inval;
-        if (delim - entry == 0)
-            goto inval;
-        if (delim - entry > KV_MAX_KEY)
+        const char *key = kv_entry_key (entry);
+        const char *val = kv_entry_val (entry);
+        if (!key || !*key || !val || !*val)
             goto inval;
         entry = kv_entry_next (kv, entry);
     }
+
     return 0;
 inval:
     errno = EINVAL;

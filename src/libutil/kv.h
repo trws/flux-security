@@ -8,10 +8,6 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-#define KV_MAX_KEY 128
-
-typedef char kv_keybuf_t[KV_MAX_KEY];
-
 /* Create/destroy/copy kv object.
  */
 struct kv *kv_create (void);
@@ -84,11 +80,10 @@ struct kv *kv_raw_decode (const char *buf, int len);
 /* Iteration example:
  *
  *   const char *entry;
- *   kv_keybuf_t keybuf;
  *
  *   entry = kv_entry_first (kv);
  *   while (entry) {
- *       const char *key = kv_entry_key (entry, keybuf);
+ *       const char *key = kv_entry_key (entry);
  *       const char *val = kv_entry_val (entry);
  *       ...
  *       entry = kv_entry_next (kv, entry);
@@ -98,7 +93,7 @@ struct kv *kv_raw_decode (const char *buf, int len);
  */
 const char *kv_entry_first (const struct kv *kv);
 const char *kv_entry_next (const struct kv *kv, const char *entry);
-const char *kv_entry_key (const char *entry, kv_keybuf_t keybuf);
+const char *kv_entry_key (const char *entry);
 const char *kv_entry_val (const char *entry);
 
 #endif /* !_UTIL_KV_H */

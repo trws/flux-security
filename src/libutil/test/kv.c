@@ -12,6 +12,24 @@
 #include "base64.h"
 #include "kv.h"
 
+static void diag_kv (struct kv *kv)
+{
+    const char *buf;
+    int len;
+    int i;
+
+    if (kv_raw_encode (kv, &buf, &len) < 0)
+        BAIL_OUT ("diag_kv: %s", strerror (errno));
+    printf ("# ");
+    for (i = 0; i < len; i++) {
+        if (buf[i] == '\0')
+            printf ("\\0");
+        else
+            putchar (buf[i]);
+    }
+    putchar ('\n');
+}
+
 static void simple_test (void)
 {
     struct kv *kv;
@@ -20,7 +38,6 @@ static void simple_test (void)
     struct kv *kv4;
     const char *s;
     int i;
-    kv_keybuf_t keybuf;
     const char *entry;
     int len;
 
@@ -38,19 +55,24 @@ static void simple_test (void)
         "kv_put b=bar works");
     ok (kv_putf (kv, "c", "%d", 42) == 0,
         "kv_putf c=42 works");
+    diag_kv (kv);
+
     ok (kv_get (kv, "a", &s) == 0 && !strcmp (s, "foo"),
         "kv_get a retrieves correct value");
     ok (kv_get (kv, "b", &s) == 0 && !strcmp (s, "bar"),
         "kv_get b retrieves correct value");
     ok (kv_getf (kv, "c", "%d", &i) == 1 && i == 42,
         "kv_getf c retrieves correct value");
+    errno = 0;
+    ok (kv_get (kv, "d", &s) < 0 && errno == ENOENT,
+        "kv_getf d fails with ENOENT");
 
     /* Iterate over entries.
      */
     entry = kv_entry_first (kv);
     ok (entry != NULL,
         "kv_entry_first works");
-    s = kv_entry_key (entry, keybuf);
+    s = kv_entry_key (entry);
     ok (s != NULL && !strcmp (s, "a"),
         "kv_entry_key returned correct key");
     s = kv_entry_val (entry);
@@ -60,7 +82,7 @@ static void simple_test (void)
     entry = kv_entry_next (kv, entry);
     ok (entry != NULL,
         "kv_entry_next works");
-    s = kv_entry_key (entry, keybuf);
+    s = kv_entry_key (entry);
     ok (s != NULL && !strcmp (s, "b"),
         "kv_entry_key returned correct key");
     s = kv_entry_val (entry);
@@ -70,7 +92,7 @@ static void simple_test (void)
     entry = kv_entry_next (kv, entry);
     ok (entry != NULL,
         "kv_entry_next works");
-    s = kv_entry_key (entry, keybuf);
+    s = kv_entry_key (entry);
     ok (s != NULL && !strcmp (s, "c"),
         "kv_entry_key returned correct key");
     s = kv_entry_val (entry);
@@ -145,7 +167,7 @@ static void empty_object (void)
 static void check_expansion (void)
 {
     struct kv *kv;
-    kv_keybuf_t keybuf;
+    char keybuf[64];
     int i, j;
 
     kv = kv_create ();
@@ -182,11 +204,7 @@ static void bad_parameters (void)
     struct kv *kv;
     struct kv *kv2;
     const char *s;
-    char giantkey[KV_MAX_KEY + 2];
     const char *entry;
-    kv_keybuf_t keybuf;
-    char tmpbuf[KV_MAX_KEY * 2];
-    int tmpbuflen;
     int len;
 
     /* Create two kv objects:  kv (emtpy), and kv2 (non-empty).
@@ -199,11 +217,6 @@ static void bad_parameters (void)
         BAIL_OUT ("kv_put failed");
     if (!(entry = kv_entry_first (kv2)))
         BAIL_OUT ("kv_entry_first kv=(one entry) returned NULL");
-
-    /* Make key that is one char beyond max key imit
-     */
-    memset (giantkey, 'k', KV_MAX_KEY + 1);
-    giantkey[KV_MAX_KEY + 1] = '\0';
 
     /* kv_copy
      */
@@ -232,12 +245,6 @@ static void bad_parameters (void)
     ok (kv_put (kv, "", NULL) < 0 && errno == EINVAL,
         "kv_put key="" fails with EINVAL");
     errno = 0;
-    ok (kv_put (kv, giantkey, "bar") < 0 && errno == EINVAL,
-        "kv_put key=(giant) fails with EINVAL");
-    errno = 0;
-    ok (kv_put (kv, "foo=baz", "bar") < 0 && errno == EINVAL,
-        "kv_put key=(contains =) fails with EINVAL");
-    errno = 0;
     ok (kv_put (kv, "foo", NULL) < 0 && errno == EINVAL,
         "kv_put val=NULL fails with EINVAL");
     errno = 0;
@@ -258,12 +265,6 @@ static void bad_parameters (void)
     errno = 0;
     ok (kv_get (kv, "", &s) < 0 && errno == EINVAL,
         "kv_get key="" fails with EINVAL");
-    errno = 0;
-    ok (kv_get (kv, giantkey, &s) < 0 && errno == EINVAL,
-        "kv_get key=(giant) fails with EINVAL");
-    errno = 0;
-    ok (kv_get (kv, "foo=baz", &s) < 0 && errno == EINVAL,
-        "kv_get key=(contains =) fails with EINVAL");
     errno = 0;
     ok (kv_getf (kv, "foo", NULL) < 0 && errno == EINVAL,
         "kv_getf fmt=NULL fails with EINVAL");
@@ -288,15 +289,8 @@ static void bad_parameters (void)
 
     ok (kv_entry_val (NULL) == NULL,
        "kv_entry_val entry=NULL returns NULL");
-    ok (kv_entry_val ("") == NULL,
-       "kv_entry_val entry="" returns NULL");
-    ok (kv_entry_val ("noequal") == NULL,
-       "kv_entry_val entry=(no =) returns NULL");
-
-    ok (kv_entry_key (NULL, keybuf) == NULL,
+    ok (kv_entry_key (NULL) == NULL,
        "kv_entry_key entry=NULL returns NULL");
-    ok (kv_entry_key (entry, NULL) == NULL,
-       "kv_entry_key keybuf=NULL returns NULL");
 
     /* kv_raw_encode
      */
@@ -313,27 +307,20 @@ static void bad_parameters (void)
     /* kv_raw_decode
      */
     errno = 0;
-    ok (kv_raw_decode ("foo=bar\0", -1) == NULL && errno == EINVAL,
+    ok (kv_raw_decode ("foo\0bar\0", -1) == NULL && errno == EINVAL,
         "kv_raw_decode len=-1 fails with EINVAL");
     errno = 0;
     ok (kv_raw_decode (NULL, 1) == NULL && errno == EINVAL,
         "kv_raw_decode buf=NULL len=1 fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode ("foo=bar", 7) == NULL && errno == EINVAL,
+    ok (kv_raw_decode ("foo\0bar", 7) == NULL && errno == EINVAL,
         "kv_raw_decode buf=(unterm) fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode ("foo=bar\0foobar\0", 15) == NULL && errno == EINVAL,
+    ok (kv_raw_decode ("foo\0bar\0foobar\0", 15) == NULL && errno == EINVAL,
         "kv_raw_decode buf=(no delim entry) fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode ("foo=bar\0=foobar\0", 16) == NULL && errno == EINVAL,
+    ok (kv_raw_decode ("foo\0bar\0\0foobar\0", 16) == NULL && errno == EINVAL,
         "kv_raw_decode buf=(empty key entry) fails with EINVAL");
-
-    tmpbuflen = strlen (giantkey) + 5;
-    strcpy (tmpbuf, giantkey);
-    strcat (tmpbuf, "=baz"); // 5 chars including \0
-    errno = 0;
-    ok (kv_raw_decode (tmpbuf, tmpbuflen) == NULL && errno == EINVAL,
-        "kv_raw_decode buf=(giant key entry) fails with EINVAL");
 
     /* kv_base64_encode
      */
