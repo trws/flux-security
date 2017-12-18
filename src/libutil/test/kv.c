@@ -38,7 +38,7 @@ static void simple_test (void)
     struct kv *kv4;
     const char *s;
     int i;
-    const char *entry;
+    const char *key;
     int len;
 
     /* Create kv object and set a=foo, b=bar.
@@ -69,38 +69,29 @@ static void simple_test (void)
 
     /* Iterate over entries.
      */
-    entry = kv_entry_first (kv);
-    ok (entry != NULL,
-        "kv_entry_first works");
-    s = kv_entry_key (entry);
-    ok (s != NULL && !strcmp (s, "a"),
-        "kv_entry_key returned correct key");
-    s = kv_entry_val (entry);
+    key = kv_next (kv, NULL);
+    ok (key != NULL && !strcmp (key, "a"),
+        "kv_next returned correct key");
+    s = kv_val (key);
     ok (s != NULL && !strcmp (s, "foo"),
-        "kv_entry_val returned correct value");
+        "kv_val returned correct value");
 
-    entry = kv_entry_next (kv, entry);
-    ok (entry != NULL,
-        "kv_entry_next works");
-    s = kv_entry_key (entry);
-    ok (s != NULL && !strcmp (s, "b"),
-        "kv_entry_key returned correct key");
-    s = kv_entry_val (entry);
+    key = kv_next (kv, key);
+    ok (key != NULL && !strcmp (key, "b"),
+        "kv_next returned correct key");
+    s = kv_val (key);
     ok (s != NULL && !strcmp (s, "bar"),
-        "kv_entry_val returned correct value");
+        "kv_val returned correct value");
 
-    entry = kv_entry_next (kv, entry);
-    ok (entry != NULL,
-        "kv_entry_next works");
-    s = kv_entry_key (entry);
-    ok (s != NULL && !strcmp (s, "c"),
-        "kv_entry_key returned correct key");
-    s = kv_entry_val (entry);
+    key = kv_next (kv, key);
+    ok (key != NULL && !strcmp (key, "c"),
+        "kv_next returned correct key");
+    s = kv_val (key);
     ok (s != NULL && !strcmp (s, "42"),
-        "kv_entry_val returned correct value");
+        "kv_val returned correct value");
 
-    ok (kv_entry_next (kv, entry) == NULL,
-        "kv_entry_next returned NULL at end");
+    ok (kv_next (kv, key) == NULL,
+        "kv_next returned NULL at end");
 
 
     /* Create a new copy through base64 codec and check for equality.
@@ -147,8 +138,8 @@ static void empty_object (void)
     kv = kv_create ();
     ok (kv != NULL,
         "kv_create works");
-    ok (kv_entry_first (kv) == NULL,
-        "kv_entry_first returns NULL");
+    ok (kv_next (kv, NULL) == NULL,
+        "kv_next key=NULL returns NULL");
     s = kv_base64_encode (kv);
     ok (s != NULL,
         "kv_base64_encode works");
@@ -215,8 +206,8 @@ static void bad_parameters (void)
         BAIL_OUT ("kv_create failed");
     if (kv_put (kv2, "foo", "bar") < 0)
         BAIL_OUT ("kv_put failed");
-    if (!(entry = kv_entry_first (kv2)))
-        BAIL_OUT ("kv_entry_first kv=(one entry) returned NULL");
+    if (!(entry = kv_next (kv2, NULL)))
+        BAIL_OUT ("kv_next kv=(one entry) key=NULL returned NULL");
 
     /* kv_copy
      */
@@ -271,26 +262,17 @@ static void bad_parameters (void)
 
     /* iteration
      */
-    ok (kv_entry_first (NULL) == NULL,
-        "kv_entry_first kv=NULL returns NULL");
-    ok (kv_entry_first (kv) == NULL,
-        "kv_entry_first kv=empty returns NULL");
+    ok (kv_next (NULL, entry) == NULL,
+       "kv_next kv=NULL returns NULL");
+    ok (kv_next (kv2, entry) == NULL,
+       "kv_next kv=(one entry) returns NULL");
+    ok (kv_next (kv2, entry - 4096) == NULL,
+       "kv_next entry=(< lower bound) == NULL");
+    ok (kv_next (kv2, entry + 4096) == NULL,
+       "kv_next entry=(> upper bound) == NULL");
 
-    ok (kv_entry_next (NULL, entry) == NULL,
-       "kv_entry_next kv=NULL returns NULL");
-    ok (kv_entry_next (kv2, entry) == NULL,
-       "kv_entry_next kv=(one entry) returns NULL");
-    ok (kv_entry_next (kv2, NULL) == NULL,
-       "kv_entry_next entry=NULL returns NULL");
-    ok (kv_entry_next (kv2, entry - 4096) == NULL,
-       "kv_entry_next entry=(< lower bound) == NULL");
-    ok (kv_entry_next (kv2, entry + 4096) == NULL,
-       "kv_entry_next entry=(> upper bound) == NULL");
-
-    ok (kv_entry_val (NULL) == NULL,
-       "kv_entry_val entry=NULL returns NULL");
-    ok (kv_entry_key (NULL) == NULL,
-       "kv_entry_key entry=NULL returns NULL");
+    ok (kv_val (NULL) == NULL,
+       "kv_val entry=NULL returns NULL");
 
     /* kv_raw_encode
      */

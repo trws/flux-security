@@ -79,22 +79,17 @@ struct kv *kv_raw_decode (const char *buf, int len);
 
 /* Iteration example:
  *
- *   const char *entry;
+ *   const char *key = NULL;
  *
- *   entry = kv_entry_first (kv);
- *   while (entry) {
- *       const char *key = kv_entry_key (entry);
- *       const char *val = kv_entry_val (entry);
+ *   while ((key = kv_next (kv, key))) {
+ *       const char *val = kv_val (key);
  *       ...
- *       entry = kv_entry_next (kv, entry);
  *   }
  *
- * N.B. the object may not be changed during iteration.
+ * kv_delete() may not be called on kv during iteration.
  */
-const char *kv_entry_first (const struct kv *kv);
-const char *kv_entry_next (const struct kv *kv, const char *entry);
-const char *kv_entry_key (const char *entry);
-const char *kv_entry_val (const char *entry);
+const char *kv_next (const struct kv *kv, const char *key);
+const char *kv_val (const char *key);
 
 #endif /* !_UTIL_KV_H */
 

@@ -124,13 +124,11 @@ static bool valid_key (const char *key)
 
 static const char *kv_find (const struct kv *kv, const char *key)
 {
-    const char *entry;
+    const char *k = NULL;
 
-    entry = kv_entry_first (kv);
-    while (entry) {
-        if (!strcmp (key, kv_entry_key (entry)))
-            return entry;
-        entry = kv_entry_next (kv, entry);
+    while ((k = kv_next (kv, k))) {
+        if (!strcmp (key, k))
+            return k;
     }
     return NULL;
 }
@@ -226,37 +224,29 @@ int kv_putf (struct kv *kv, const char *key, const char *fmt, ...)
     return 0;
 }
 
-const char *kv_entry_next (const struct kv *kv, const char *entry)
+const char *kv_next (const struct kv *kv, const char *key)
 {
     int entry_len;
     int entry_offset;
 
-    if (!kv || !entry || entry < kv->buf || entry > kv->buf + kv->len)
-        return NULL;
-    entry_offset = entry - kv->buf;
-    entry_len = entry_length (entry, kv->len - entry_offset);
-    if (entry_len < 0 || entry_offset + entry_len == kv->len)
-        return NULL;
-    return entry + entry_len;
-}
-
-const char *kv_entry_first (const struct kv *kv)
-{
     if (!kv || kv->len == 0)
         return NULL;
-    return kv->buf;
-}
-
-const char *kv_entry_val (const char *entry)
-{
-    if (!entry)
+    if (!key)
+        return kv->buf;
+    if (key < kv->buf || key > kv->buf + kv->len)
         return NULL;
-    return entry + strlen (entry) + 1;
+    entry_offset = key - kv->buf;
+    entry_len = entry_length (key, kv->len - entry_offset);
+    if (entry_len < 0 || entry_offset + entry_len == kv->len)
+        return NULL;
+    return key + entry_len;
 }
 
-const char *kv_entry_key (const char *entry)
+const char *kv_val (const char *key)
 {
-    return entry;
+    if (!key)
+        return NULL;
+    return key + strlen (key) + 1;
 }
 
 int kv_get (const struct kv *kv, const char *key, const char **val)
@@ -272,7 +262,7 @@ int kv_get (const struct kv *kv, const char *key, const char **val)
         return -1;
     }
     if (val)
-        *val = kv_entry_val (entry);
+        *val = kv_val (entry);
     return 0;
 }
 
@@ -300,7 +290,7 @@ static int kv_check_integrity (struct kv *kv)
 {
     int nullcount;
     int i;
-    const char *entry;
+    const char *key = NULL;
 
     /* properly terminated
      */
@@ -319,13 +309,10 @@ static int kv_check_integrity (struct kv *kv)
 
     /* nonzero key and val lengths
      */
-    entry = kv_entry_first (kv);
-    while (entry) {
-        const char *key = kv_entry_key (entry);
-        const char *val = kv_entry_val (entry);
-        if (!key || !*key || !val || !*val)
+    while ((key = kv_next (kv, key))) {
+        const char *val = kv_val (key);
+        if (strlen (key) == 0 || !val || strlen (val) == 0)
             goto inval;
-        entry = kv_entry_next (kv, entry);
     }
 
     return 0;
