@@ -197,33 +197,6 @@ int kv_put (struct kv *kv, const char *key, const char *val)
     return 0;
 }
 
-int kv_putf (struct kv *kv, const char *key, const char *fmt, ...)
-{
-    va_list ap;
-    char *val;
-    int rc;
-
-    if (!fmt) { // N.B. kv and key are checked by kv_put
-        errno = EINVAL;
-        return -1;
-    }
-    va_start (ap, fmt);
-    rc = vasprintf (&val, fmt, ap);
-    va_end (ap);
-    if (rc < 0) {
-        errno = ENOMEM;
-        return -1;
-    }
-    if (kv_put (kv, key, val) < 0) {
-        int saved_errno = errno;
-        free (val);
-        errno = saved_errno;
-        return -1;
-    }
-    free (val);
-    return 0;
-}
-
 const char *kv_next (const struct kv *kv, const char *key)
 {
     int entry_len;
@@ -264,24 +237,6 @@ int kv_get (const struct kv *kv, const char *key, const char **val)
     if (val)
         *val = kv_val (entry);
     return 0;
-}
-
-int kv_getf (const struct kv *kv, const char *key, const char *fmt, ...)
-{
-    va_list ap;
-    const char *val;
-    int rc;
-
-    if (!fmt) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (kv_get (kv, key, &val) < 0)
-        return -1;
-    va_start (ap, fmt);
-    rc = vsscanf (val, fmt, ap);
-    va_end (ap);
-    return rc;
 }
 
 /* Validate a just-decoded kv buffer.

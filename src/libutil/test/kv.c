@@ -37,11 +37,10 @@ static void simple_test (void)
     struct kv *kv3;
     struct kv *kv4;
     const char *s;
-    int i;
     const char *key;
     int len;
 
-    /* Create kv object and set a=foo, b=bar.
+    /* Create kv object and set a=foo, b=bar, c=baz.
      * Validate values.
      */
     kv = kv_create ();
@@ -53,19 +52,19 @@ static void simple_test (void)
         "kv_get a retrieves correct value");
     ok (kv_put (kv, "b", "bar") == 0,
         "kv_put b=bar works");
-    ok (kv_putf (kv, "c", "%d", 42) == 0,
-        "kv_putf c=42 works");
+    ok (kv_put (kv, "c", "baz") == 0,
+        "kv_put c=baz works");
     diag_kv (kv);
 
     ok (kv_get (kv, "a", &s) == 0 && !strcmp (s, "foo"),
         "kv_get a retrieves correct value");
     ok (kv_get (kv, "b", &s) == 0 && !strcmp (s, "bar"),
         "kv_get b retrieves correct value");
-    ok (kv_getf (kv, "c", "%d", &i) == 1 && i == 42,
-        "kv_getf c retrieves correct value");
+    ok (kv_get (kv, "c", &s) == 0 && !strcmp (s, "baz"),
+        "kv_get b retrieves correct value");
     errno = 0;
     ok (kv_get (kv, "d", &s) < 0 && errno == ENOENT,
-        "kv_getf d fails with ENOENT");
+        "kv_get d fails with ENOENT");
 
     /* Iterate over entries.
      */
@@ -87,7 +86,7 @@ static void simple_test (void)
     ok (key != NULL && !strcmp (key, "c"),
         "kv_next returned correct key");
     s = kv_val (key);
-    ok (s != NULL && !strcmp (s, "42"),
+    ok (s != NULL && !strcmp (s, "baz"),
         "kv_val returned correct value");
 
     ok (kv_next (kv, key) == NULL,
@@ -159,7 +158,9 @@ static void check_expansion (void)
 {
     struct kv *kv;
     char keybuf[64];
-    int i, j;
+    char valbuf[64];
+    const char *s;
+    int i;
 
     kv = kv_create ();
     ok (kv != NULL,
@@ -172,20 +173,21 @@ static void check_expansion (void)
      */
     for (i = 0; i < 100; i++) {
         snprintf (keybuf, sizeof (keybuf), "key%032d", i);
-        //diag ("key%032d=%032d", i, i);
-        if (kv_putf (kv, keybuf, "%032d", i) < 0)
+        snprintf (valbuf, sizeof (valbuf), "%032d", i);
+        if (kv_put (kv, keybuf, valbuf) < 0)
             break;
     }
     ok (i == 100,
-        "kv_putf added 100 69-byte entries");
+        "kv_put added 100 69-byte entries");
 
-    for (j = 0; j < 100; j++) {
-        snprintf (keybuf, sizeof (keybuf), "key%032d", j);
-        if (kv_getf (kv, keybuf, "%d", &i) < 0 || i != j)
+    for (i = 0; i < 100; i++) {
+        snprintf (keybuf, sizeof (keybuf), "key%032d", i);
+        snprintf (valbuf, sizeof (valbuf), "%032d", i);
+        if (kv_get (kv, keybuf, &s) < 0 || strcmp (s, valbuf) != 0)
             break;
     }
-    ok (j == 100,
-        "kv_getf verified 100 69-byte entries");
+    ok (i == 100,
+        "kv_get verified 100 69-byte entries");
 
     kv_destroy (kv);
 }
@@ -224,7 +226,7 @@ static void bad_parameters (void)
     ok (kv_equal (NULL, NULL) == false,
         "kv_equal kv1=NULL kv2=NULL returns false");
 
-    /* kv_put, kv_putf
+    /* kv_put
      */
     errno = 0;
     ok (kv_put (NULL, "foo", "bar") < 0 && errno == EINVAL,
@@ -238,14 +240,8 @@ static void bad_parameters (void)
     errno = 0;
     ok (kv_put (kv, "foo", NULL) < 0 && errno == EINVAL,
         "kv_put val=NULL fails with EINVAL");
-    errno = 0;
-    ok (kv_putf (NULL, "foo", "bar") < 0 && errno == EINVAL,
-        "kv_putf kv=NULL fails with EINVAL");
-    errno = 0;
-    ok (kv_putf (kv, "foo", NULL) < 0 && errno == EINVAL,
-        "kv_putf fmt=NULL fails with EINVAL");
 
-    /* kv_get, kv_getf
+    /* kv_get
      */
     errno = 0;
     ok (kv_get (NULL, "foo", &s) < 0 && errno == EINVAL,
@@ -256,9 +252,6 @@ static void bad_parameters (void)
     errno = 0;
     ok (kv_get (kv, "", &s) < 0 && errno == EINVAL,
         "kv_get key="" fails with EINVAL");
-    errno = 0;
-    ok (kv_getf (kv, "foo", NULL) < 0 && errno == EINVAL,
-        "kv_getf fmt=NULL fails with EINVAL");
 
     /* iteration
      */

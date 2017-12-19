@@ -38,23 +38,6 @@ int kv_put (struct kv *kv, const char *key, const char *val);
  */
 int kv_get (const struct kv *kv, const char *key, const char **val);
 
-/* Convenience wrapper for kv_put with printf-style args for value.
- * Return 0 on success, -1 on failure with errno set:
- *   EINVAL - invalid argument / sscanf problem
- *   ENOENT - key not found
- *   ENOMEM - out of memory
- */
-int kv_putf (struct kv *kv, const char *key, const char *fmt, ...)
-        __attribute__ ((format (printf, 3, 4)));
-
-/* Convenience wrapper for kv_get with scanf-style args for value.
- * Return number of matches on success, -1 on failure wtih errno set:
- *   EINVAL - invalid argument
- *   ENOENT - key not found
- */
-int kv_getf (const struct kv *kv, const char *key, const char *fmt, ...)
-        __attribute__ ((format (scanf, 3, 4)));
-
 /* Encode kv object as NULL-terminated base64 string (do not free).
  * String remains valid until the next call to kv_base64_encode()
  * or kv_destroy().  Return NULL-terminated base64 string on success,
