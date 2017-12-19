@@ -29,10 +29,12 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
-#include <stdarg.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <time.h>
 #include <assert.h>
 
-#include "base64.h"
 #include "kv.h"
 
 #define KV_CHUNK 4096
@@ -41,7 +43,6 @@ struct kv {
     char *buf;
     int bufsz;
     int len;
-    char *base64;
 };
 
 void kv_destroy (struct kv *kv)
@@ -49,12 +50,15 @@ void kv_destroy (struct kv *kv)
     if (kv) {
         int saved_errno = errno;
         free (kv->buf);
-        free (kv->base64);
         free (kv);
         errno = saved_errno;
     }
 }
 
+/* Create kv object from 'buf' and 'len'.
+ * If len == 0, create an empty object.
+ * Returns object on success, NULL on failure with errno set.
+ */
 static struct kv *kv_create_from (const char *buf, int len)
 {
     struct kv *kv;
@@ -102,6 +106,7 @@ bool kv_equal (const struct kv *kv1, const struct kv *kv2)
 }
 
 /* Grow kv buffer until it can accommodate 'needsz' new characters.
+ * Returns 0 on success, -1 on failure with errno set.
  */
 static int kv_expand (struct kv *kv, int needsz)
 {
@@ -122,24 +127,36 @@ static bool valid_key (const char *key)
     return true;
 }
 
-static const char *kv_find (const struct kv *kv, const char *key)
+/* Look up entry by key (and type if type != KV_UNKNOWN).
+ * Returns entry on success, NULL on failure with errno set.
+ */
+static const char *kv_find (const struct kv *kv, const char *key,
+                            enum kv_type type)
 {
-    const char *k = NULL;
+    const char *entry = NULL;
 
-    while ((k = kv_next (kv, k))) {
-        if (!strcmp (key, k))
-            return k;
+    if (!kv || !valid_key (key)) {
+        errno = EINVAL;
+        return NULL;
     }
+    while ((entry = kv_next (kv, entry))) {
+        if (!strcmp (key, entry)) {
+            if (type == KV_UNKNOWN || kv_typeof (entry) == type)
+                return entry;
+            break;
+        }
+    }
+    errno = ENOENT;
     return NULL;
 }
 
-/* Return length, not to exceed maxlen, of entry consisting of key\0value\0
+/* Return length, not to exceed maxlen, of entry consisting of key\0Tvalue\0
  * Return -1 on invalid entry.
  */
 static int entry_length (const char *entry, int maxlen)
 {
     int keylen;
-    int vallen;
+    int vallen; // including T
 
     keylen = strnlen (entry, maxlen);
     if (keylen == 0 || keylen == maxlen)
@@ -158,14 +175,8 @@ int kv_delete (struct kv *kv, const char *key)
     int entry_offset;
     int entry_len;
 
-    if (!kv || !valid_key (key)) {
-        errno = EINVAL;
+    if (!(entry = kv_find (kv, key, KV_UNKNOWN)))
         return -1;
-    }
-    if (!(entry = kv_find (kv, key))) {
-        errno = ENOENT;
-        return -1;
-    }
     entry_offset = entry - kv->buf;
     entry_len = entry_length (entry, kv->len - entry_offset);
     assert (entry_len >= 0);
@@ -176,7 +187,12 @@ int kv_delete (struct kv *kv, const char *key)
     return 0;
 }
 
-int kv_put (struct kv *kv, const char *key, const char *val)
+/* Put typed key=val (val is in string form).
+ * If key already exists, remove it first.
+ * Return 0 on success, -1 on failure with errno set.
+ */
+static int kv_put (struct kv *kv, const char *key,
+                   enum kv_type type, const char *val)
 {
     if (!kv || !valid_key (key) || !val) {
         errno = EINVAL;
@@ -188,40 +204,57 @@ int kv_put (struct kv *kv, const char *key, const char *val)
     }
     int keylen = strlen (key);
     int vallen = strlen (val);
-    if (kv_expand (kv, keylen + vallen + 2) < 0) // key\0val\0
+    if (kv_expand (kv, keylen + vallen + 3) < 0) // key\0Tval\0
         return -1;
     strncpy (&kv->buf[kv->len], key, keylen + 1);
     kv->len += keylen + 1;
+    kv->buf[kv->len++] = type;
     strncpy (&kv->buf[kv->len], val, vallen + 1);
     kv->len += vallen + 1;
     return 0;
 }
 
-int kv_putf (struct kv *kv, const char *key, const char *fmt, ...)
+int kv_put_string (struct kv *kv, const char *key, const char *val)
 {
-    va_list ap;
-    char *val;
-    int rc;
+    return kv_put (kv, key, KV_STRING, val);
+}
 
-    if (!fmt) { // N.B. kv and key are checked by kv_put
+int kv_put_int64 (struct kv *kv, const char *key, int64_t val)
+{
+    char s[64];
+    if (snprintf (s, sizeof (s), "%" PRIi64, val) >= sizeof (s)) {
         errno = EINVAL;
         return -1;
     }
-    va_start (ap, fmt);
-    rc = vasprintf (&val, fmt, ap);
-    va_end (ap);
-    if (rc < 0) {
-        errno = ENOMEM;
+    return kv_put (kv, key, KV_INT64, s);
+}
+
+int kv_put_double (struct kv *kv, const char *key, double val)
+{
+    char s[64];
+    if (snprintf (s, sizeof (s), "%f", val) >= sizeof (s)) {
+        errno = EINVAL;
         return -1;
     }
-    if (kv_put (kv, key, val) < 0) {
-        int saved_errno = errno;
-        free (val);
-        errno = saved_errno;
+    return kv_put (kv, key, KV_DOUBLE, s);
+}
+
+int kv_put_bool (struct kv *kv, const char *key, bool val)
+{
+    return kv_put (kv, key, KV_BOOL, val ? "true" : "false");
+}
+
+int kv_put_timestamp (struct kv *kv, const char *key, time_t val)
+{
+    char s[64];
+    struct tm tm;
+
+    if (val < 0 || !gmtime_r (&val, &tm)
+                || strftime (s, sizeof (s), "%FT%TZ", &tm) == 0) {
+        errno = EINVAL;
         return -1;
     }
-    free (val);
-    return 0;
+    return kv_put (kv, key, KV_TIMESTAMP, s);
 }
 
 const char *kv_next (const struct kv *kv, const char *key)
@@ -242,49 +275,111 @@ const char *kv_next (const struct kv *kv, const char *key)
     return key + entry_len;
 }
 
-const char *kv_val (const char *key)
+const char *kv_val_string (const char *key)
 {
     if (!key)
-        return NULL;
-    return key + strlen (key) + 1;
+        return "";
+    return &key[strlen (key) + 2];
 }
 
-int kv_get (const struct kv *kv, const char *key, const char **val)
+int64_t kv_val_int64 (const char *key)
 {
-    const char *entry;
+    return strtoll (kv_val_string (key), NULL, 10);
+}
 
-    if (!kv || !valid_key (key)) {
-        errno = EINVAL;
-        return -1;
+double kv_val_double (const char *key)
+{
+    return strtod (kv_val_string (key), NULL);
+}
+
+bool kv_val_bool (const char *key)
+{
+    const char *s = kv_val_string (key);
+    if (!strcmp (s, "false") || strlen (s) == 0)
+        return false;
+    else
+        return true;
+}
+
+time_t kv_val_timestamp (const char *key)
+{
+    struct tm tm;
+    time_t t;
+    const char *s = kv_val_string (key);
+    if (!strptime (s, "%FT%TZ", &tm) || (t = timegm (&tm)) < 0)
+        return 0;
+    return t;
+}
+
+enum kv_type kv_typeof (const char *key)
+{
+    if (!key)
+        return KV_UNKNOWN;
+    enum kv_type type = key[strlen (key) + 1];
+    switch (type) {
+        case KV_STRING:
+        case KV_INT64:
+        case KV_DOUBLE:
+        case KV_BOOL:
+        case KV_TIMESTAMP:
+            return type;
+        default:
+            return KV_UNKNOWN;
     }
-    if (!(entry = kv_find (kv, key))) {
-        errno = ENOENT;
+}
+
+int kv_get_string (const struct kv *kv, const char *key, const char **val)
+{
+    const char *entry = kv_find (kv, key, KV_STRING);
+    if (!entry)
         return -1;
-    }
     if (val)
-        *val = kv_val (entry);
+        *val = kv_val_string (entry);
     return 0;
 }
 
-int kv_getf (const struct kv *kv, const char *key, const char *fmt, ...)
+int kv_get_int64 (const struct kv *kv, const char *key, int64_t *val)
 {
-    va_list ap;
-    const char *val;
-    int rc;
+    const char *entry = kv_find (kv, key, KV_INT64);
+    if (!entry)
+        return -1;
+    if (val)
+        *val = kv_val_int64 (entry);
+    return 0;
+}
 
-    if (!fmt) {
-        errno = EINVAL;
+int kv_get_double (const struct kv *kv, const char *key, double *val)
+{
+    const char *entry = kv_find (kv, key, KV_DOUBLE);
+    if (!entry)
         return -1;
-    }
-    if (kv_get (kv, key, &val) < 0)
+    if (val)
+        *val = kv_val_double (entry);
+    return 0;
+}
+
+int kv_get_bool (const struct kv *kv, const char *key, bool *val)
+{
+    const char *entry = kv_find (kv, key, KV_BOOL);
+    if (!entry)
         return -1;
-    va_start (ap, fmt);
-    rc = vsscanf (val, fmt, ap);
-    va_end (ap);
-    return rc;
+    if (val)
+        *val = kv_val_bool (entry);
+    return 0;
+}
+
+int kv_get_timestamp (const struct kv *kv, const char *key, time_t *val)
+{
+    const char *entry = kv_find (kv, key, KV_TIMESTAMP);
+    if (!entry)
+        return -1;
+    if (val)
+        *val = kv_val_timestamp (entry);
+    return 0;
 }
 
 /* Validate a just-decoded kv buffer.
+ * Return 0 on success, -1 on failure with errno set.
  */
 static int kv_check_integrity (struct kv *kv)
 {
@@ -307,14 +402,15 @@ static int kv_check_integrity (struct kv *kv)
     if (nullcount % 2 != 0)
         goto inval;
 
-    /* nonzero key and val lengths
+    /* nonzero key length
+     * value has valid type hint char
      */
     while ((key = kv_next (kv, key))) {
-        const char *val = kv_val (key);
-        if (strlen (key) == 0 || !val || strlen (val) == 0)
+        if (strlen (key) == 0)
+            goto inval;
+        if (kv_typeof (key) == KV_UNKNOWN)
             goto inval;
     }
-
     return 0;
 inval:
     errno = EINVAL;
@@ -345,57 +441,59 @@ struct kv *kv_raw_decode (const char *buf, int len)
     return kv;
 }
 
-const char *kv_base64_encode (const struct kv *kv)
+/* Wrapper for kv_put() which adds 'prefix' to key, if non-NULL.
+ * Returns 0 on success, -1 on failure with errno set (ENOMEM).
+ */
+static int kv_put_prefix (struct kv *kv, const char *prefix, const char *key,
+                          enum kv_type type, const char *val)
 {
-    char *dst;
-    int dstlen;
-    int rc;
+    char *newkey = NULL;
 
-    if (!kv) {
-        errno = EINVAL;
-        return NULL;
+    if (prefix) {
+        if (asprintf (&newkey, "%s%s", prefix, key) < 0)
+            return -1;
+        key = newkey;
     }
-    dstlen = base64_encode_length (kv->len);
-    if (!(dst = malloc (dstlen)))
-        return NULL;
-    rc = base64_encode_block (dst, &dstlen, kv->buf, kv->len);
-    assert (rc == 0);
-
-    free (kv->base64);
-    /* N.B. cast away const here to allow this function to return
-     * a const value owned by struct kv.  This does not change the "value"
-     * per se, so it is safe.
-     */
-    ((struct kv *)(kv))->base64 = dst;
-    return kv->base64;
+    if (kv_put (kv, key, type, val) < 0) {
+        int saved_errno = errno;
+        free (newkey);
+        errno = saved_errno;
+        return -1;
+    }
+    free (newkey);
+    return 0;
 }
 
-struct kv *kv_base64_decode (const char *buf, int len)
+int kv_join (struct kv *kv1, const struct kv *kv2, const char *prefix)
 {
-    char *dst;
-    int dstlen;
-    struct kv *kv;
+    const char *key = NULL;
 
-    if (len < 0 || (len > 0 && buf == NULL)) {
-        errno = EINVAL;
-        return NULL;
+    while ((key = kv_next (kv2, key))) {
+        if (kv_put_prefix (kv1, prefix, key, kv_typeof (key),
+                                             kv_val_string (key)) < 0)
+            return -1;
     }
-    dstlen = base64_decode_length (len);
-    if (!(dst = malloc (dstlen)))
+    return 0;
+}
+
+struct kv *kv_split (const struct kv *kv1, const char *prefix)
+{
+    const char *key = NULL;
+    struct kv *kv2;
+    int n = prefix ? strlen (prefix) : 0;
+
+    if (!(kv2 = kv_create ()))
         return NULL;
-    if (base64_decode_block (dst, &dstlen, buf, len) < 0) {
-        free (dst);
-        errno = EINVAL;
-        return NULL;
+    while ((key = kv_next (kv1, key))) {
+        if (strlen (key) > n && !strncmp (key, prefix, n)) {
+            if (kv_put (kv2, key + n, kv_typeof (key),
+                                      kv_val_string (key)) < 0) {
+                kv_destroy (kv2);
+                return NULL;
+            }
+        }
     }
-    if (!(kv = kv_raw_decode (dst, dstlen))) {
-        int saved_errno = errno;
-        free (dst);
-        errno = saved_errno;
-        return NULL;
-    }
-    free (dst);
-    return kv;
+    return kv2;
 }
 
 /*

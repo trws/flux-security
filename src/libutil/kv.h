@@ -1,12 +1,25 @@
 #ifndef _UTIL_KV_H
 #define _UTIL_KV_H
 
-/* Simple serialization:
- *   key=value\0key=value\0...key=value\0
+/* Simple serialization (keys and values are encoded as strings):
+ *   key\0Tvalue\0key\0Tvalue\0...key\0Tvalue\0
+ *
+ * T=single-char type hint:
+ *   s=string, i=int64_t, d=double, b=bool, t=timestamp
  */
 
-#include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <time.h> // time_t
+
+enum kv_type {
+    KV_UNKNOWN = 0,
+    KV_STRING = 's',
+    KV_INT64 = 'i',
+    KV_DOUBLE = 'd',
+    KV_BOOL = 'b',
+    KV_TIMESTAMP = 't',
+};
 
 /* Create/destroy/copy kv object.
  */
@@ -14,11 +27,23 @@ struct kv *kv_create (void);
 void kv_destroy (struct kv *kv);
 struct kv *kv_copy (const struct kv *kv);
 
+/* Add kv2 entries to kv1, prepending 'prefix' to its keys (if non-NULL).
+ * When there are key conflicts, values from kv2 override kv1.
+ */
+int kv_join (struct kv *kv1, const struct kv *kv2, const char *prefix);
+
+/* Find entries in kv with matching key prefix.  Create new kv object,
+ * consisting of these entries with key prefix removed.
+ * Returns new kv object on success, NULL on failure with errno set.
+ */
+struct kv *kv_split (const struct kv *kv, const char *prefix);
+
 /* Return true if kv1 is identical to kv2 (including entry order)
  */
 bool kv_equal (const struct kv *kv1, const struct kv *kv2);
 
 /* Remove 'key' from kv object.
+ * Return 0 on success, -1 on failure with errno set.
  *   EINVAL - invalid argument
  *   ENOENT - key not found
  */
@@ -29,43 +54,22 @@ int kv_delete (struct kv *kv, const char *key);
  *   EINVAL - invalid argument
  *   ENOMEM - out of memory
  */
-int kv_put (struct kv *kv, const char *key, const char *val);
+int kv_put_string (struct kv *kv, const char *key, const char *val);
+int kv_put_int64 (struct kv *kv, const char *key, int64_t val);
+int kv_put_double (struct kv *kv, const char *key, double val);
+int kv_put_bool (struct kv *kv, const char *key, bool val);
+int kv_put_timestamp (struct kv *kv, const char *key, time_t t);
 
-/* Find key in kv object and set val (if 'val' is non-NULL).
- * Return 0 on success, -1 on failure wtih errno set:
- *   EINVAL - invalid argument
- *   ENOENT - key not found
- */
-int kv_get (const struct kv *kv, const char *key, const char **val);
-
-/* Convenience wrapper for kv_put with printf-style args for value.
+/* Find key in kv object and get val (if non-NULL).
  * Return 0 on success, -1 on failure with errno set:
- *   EINVAL - invalid argument / sscanf problem
- *   ENOENT - key not found
- *   ENOMEM - out of memory
- */
-int kv_putf (struct kv *kv, const char *key, const char *fmt, ...)
-        __attribute__ ((format (printf, 3, 4)));
-
-/* Convenience wrapper for kv_get with scanf-style args for value.
- * Return number of matches on success, -1 on failure wtih errno set:
  *   EINVAL - invalid argument
- *   ENOENT - key not found
+ *   ENOENT - key of requested type not found
  */
-int kv_getf (const struct kv *kv, const char *key, const char *fmt, ...)
-        __attribute__ ((format (scanf, 3, 4)));
-
-/* Encode kv object as NULL-terminated base64 string (do not free).
- * String remains valid until the next call to kv_base64_encode()
- * or kv_destroy().  Return NULL-terminated base64 string on success,
- * NULL on failure with errno set.
- */
-const char *kv_base64_encode (const struct kv *kv);
-
-/* Decode base64 string to kv object (destroy with kv_destroy).
- * Return kv object on success, NULL on failure with errno set.
- */
-struct kv *kv_base64_decode (const char *s, int len);
+int kv_get_string (const struct kv *kv, const char *key, const char **val);
+int kv_get_int64 (const struct kv *kv, const char *key, int64_t *val);
+int kv_get_double (const struct kv *kv, const char *key, double *val);
+int kv_get_bool (const struct kv *kv, const char *key, bool *val);
+int kv_get_timestamp (const struct kv *kv, const char *key, time_t *val);
 
 /* Access internal binary encoding.
  * Return 0 on success, -1 on failure with errno set.
@@ -82,14 +86,25 @@ struct kv *kv_raw_decode (const char *buf, int len);
  *   const char *key = NULL;
  *
  *   while ((key = kv_next (kv, key))) {
- *       const char *val = kv_val (key);
+ *       const char *val = kv_val_string (key);
  *       ...
  *   }
  *
  * kv_delete() may not be called on kv during iteration.
  */
 const char *kv_next (const struct kv *kv, const char *key);
-const char *kv_val (const char *key);
+enum kv_type kv_typeof (const char *key);
+
+/* Iteration value accessors for keys returned by kv_next().
+ * Use kv_typeof() to choose the proper accessor; if type doesn't
+ * match, returned value is undefined.
+ */
+const char *kv_val_string (const char *key); // N.B. never returns NULL
+int64_t kv_val_int64 (const char *key);
+double kv_val_double (const char *key);
+bool kv_val_bool (const char *key);
+time_t kv_val_timestamp (const char *key);
+
 
 #endif /* !_UTIL_KV_H */
 
