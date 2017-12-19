@@ -27,6 +27,17 @@ struct kv *kv_create (void);
 void kv_destroy (struct kv *kv);
 struct kv *kv_copy (const struct kv *kv);
 
+/* Add kv2 entries to kv1, prepending 'prefix' to its keys (if non-NULL).
+ * When there are key conflicts, values from kv2 override kv1.
+ */
+int kv_join (struct kv *kv1, const struct kv *kv2, const char *prefix);
+
+/* Find entries in kv with matching key prefix.  Create new kv object,
+ * consisting of these entries with key prefix removed.
+ * Returns new kv object on success, NULL on failure with errno set.
+ */
+struct kv *kv_split (const struct kv *kv, const char *prefix);
+
 /* Return true if kv1 is identical to kv2 (including entry order)
  */
 bool kv_equal (const struct kv *kv1, const struct kv *kv2);

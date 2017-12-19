@@ -441,6 +441,61 @@ struct kv *kv_raw_decode (const char *buf, int len)
     return kv;
 }
 
+/* Wrapper for kv_put() which adds 'prefix' to key, if non-NULL.
+ * Returns 0 on success, -1 on failure with errno set (ENOMEM).
+ */
+static int kv_put_prefix (struct kv *kv, const char *prefix, const char *key,
+                          enum kv_type type, const char *val)
+{
+    char *newkey = NULL;
+
+    if (prefix) {
+        if (asprintf (&newkey, "%s%s", prefix, key) < 0)
+            return -1;
+        key = newkey;
+    }
+    if (kv_put (kv, key, type, val) < 0) {
+        int saved_errno = errno;
+        free (newkey);
+        errno = saved_errno;
+        return -1;
+    }
+    free (newkey);
+    return 0;
+}
+
+int kv_join (struct kv *kv1, const struct kv *kv2, const char *prefix)
+{
+    const char *key = NULL;
+
+    while ((key = kv_next (kv2, key))) {
+        if (kv_put_prefix (kv1, prefix, key, kv_typeof (key),
+                                             kv_val_string (key)) < 0)
+            return -1;
+    }
+    return 0;
+}
+
+struct kv *kv_split (const struct kv *kv1, const char *prefix)
+{
+    const char *key = NULL;
+    struct kv *kv2;
+    int n = prefix ? strlen (prefix) : 0;
+
+    if (!(kv2 = kv_create ()))
+        return NULL;
+    while ((key = kv_next (kv1, key))) {
+        if (strlen (key) > n && !strncmp (key, prefix, n)) {
+            if (kv_put (kv2, key + n, kv_typeof (key),
+                                      kv_val_string (key)) < 0) {
+                kv_destroy (kv2);
+                return NULL;
+            }
+        }
+    }
+    return kv2;
+}
+
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
  */

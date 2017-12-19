@@ -403,6 +403,69 @@ void key_update (void)
     kv_destroy (kv);
 }
 
+static struct kv *create_test_kv (void)
+{
+    struct kv *kv;
+    if (!(kv = kv_create ()))
+        BAIL_OUT ("kv_create failed");
+    if (kv_put_string (kv, "a", "foo") < 0
+        || kv_put_int64 (kv, "b", 42) < 0
+        || kv_put_double (kv, "c", 3.14) < 0
+        || kv_put_bool (kv, "d", true) < 0)
+        BAIL_OUT ("kv_put failed");
+    return kv;
+}
+
+
+void join_split (void)
+{
+    struct kv *kv;
+    struct kv *kv1;
+    struct kv *kv2;
+    struct kv *kv_cpy;
+
+    if (!(kv = kv_create()))
+        BAIL_OUT ("kv_create failed");
+
+    /* kv = foo.kv1 + bar.kv2
+     */
+    kv1 = create_test_kv();
+    kv2 = create_test_kv();
+    ok (kv_join (kv, kv1, "foo.") == 0,
+        "kv_join added foo");
+    ok (kv_join (kv, kv2, "bar.") == 0,
+        "kv_join added bar");
+    diag_kv (kv);
+
+    /* kv_cpy = kv.bar
+     */
+    ok ((kv_cpy = kv_split (kv, "bar.")) != NULL && kv_equal (kv_cpy, kv2),
+        "kv_split bar works");
+    kv_destroy (kv_cpy);
+
+    /* kv_cpy = kv.foo
+     */
+    ok ((kv_cpy = kv_split (kv, "foo.")) != NULL && kv_equal (kv_cpy, kv1),
+        "kv_split foo works");
+    kv_destroy (kv_cpy);
+
+    kv_destroy (kv);
+
+    /* kv = kv1 + kv1 */
+    if (!(kv = kv_create ()))
+        BAIL_OUT ("kv_create failed");
+    ok (kv_join (kv, kv1, NULL) == 0,
+        "kv_join kv = kv1");
+    ok (kv_join (kv, kv1, NULL) == 0,
+        "kv_join jv += kv1 (again)");
+    ok (kv_equal (kv, kv1),
+        "kv_equal says kv == kv1");
+
+    kv_destroy (kv1);
+    kv_destroy (kv2);
+    kv_destroy (kv);
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -413,6 +476,7 @@ int main (int argc, char *argv[])
     bad_parameters ();
     key_deletion ();
     key_update ();
+    join_split ();
 
     done_testing ();
 }
