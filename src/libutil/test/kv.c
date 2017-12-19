@@ -9,7 +9,6 @@
 #include <errno.h>
 
 #include "src/libtap/tap.h"
-#include "base64.h"
 #include "kv.h"
 
 static void diag_kv (struct kv *kv)
@@ -35,7 +34,6 @@ static void simple_test (void)
     struct kv *kv;
     struct kv *kv2;
     struct kv *kv3;
-    struct kv *kv4;
     const char *s;
     const char *key;
     int len;
@@ -92,61 +90,46 @@ static void simple_test (void)
     ok (kv_next (kv, key) == NULL,
         "kv_next returned NULL at end");
 
-
-    /* Create a new copy through base64 codec and check for equality.
-     */
-    s = kv_base64_encode (kv);
-    ok (s != NULL,
-        "kv_base64_encode works");
-    diag ("encoded: %s", s);
-    kv2 = kv_base64_decode (s, strlen (s));
-    ok (kv2 != NULL,
-        "kv_base64_decode works");
-    ok (kv_equal (kv, kv2),
-        "kv_equal says new copy is identical");
-
     /* Create a new copy through kv_copy() and check for equality.
      */
-    kv3 = kv_copy (kv);
-    ok (kv3 != NULL,
+    kv2 = kv_copy (kv);
+    ok (kv2 != NULL,
         "kv_copy works");
-    ok (kv_equal (kv, kv3),
+    ok (kv_equal (kv, kv2),
         "kv_equal says new copy is identical");
 
     /* Create a new copy through raw "codec" and check for equality.
      */
     ok (kv_raw_encode (kv, &s, &len) == 0,
         "kv_raw_encode works");
-    kv4 = kv_raw_decode (s, len);
-    ok (kv4 != NULL,
+    kv3 = kv_raw_decode (s, len);
+    ok (kv3 != NULL,
         "kv_raw_decode works");
-    ok (kv_equal (kv, kv4),
+    ok (kv_equal (kv, kv3),
         "kv_equal says new copy is identical");
 
     kv_destroy (kv);
     kv_destroy (kv2);
     kv_destroy (kv3);
-    kv_destroy (kv4);
 }
 
 static void empty_object (void)
 {
     struct kv *kv, *kv2;
-    const char *s;
+    const char *buf;
+    int len;
 
     kv = kv_create ();
     ok (kv != NULL,
         "kv_create works");
     ok (kv_next (kv, NULL) == NULL,
         "kv_next key=NULL returns NULL");
-    s = kv_base64_encode (kv);
-    ok (s != NULL,
-        "kv_base64_encode works");
-    diag ("empty kv: %s (len=%d)", s, strlen (s));
+    ok (kv_raw_encode (kv, &buf, &len) == 0,
+        "kv_raw_encode works");
 
-    kv2 = kv_base64_decode (s, strlen (s));
+    kv2 = kv_raw_decode (buf, len);
     ok (kv2 != NULL,
-        "kv_base64_decode works");
+        "kv_raw_decode works");
     ok (kv_equal (kv, kv2),
         "kv_equal says they are identical");
 
@@ -296,34 +279,6 @@ static void bad_parameters (void)
     errno = 0;
     ok (kv_raw_decode ("foo\0bar\0\0foobar\0", 16) == NULL && errno == EINVAL,
         "kv_raw_decode buf=(empty key entry) fails with EINVAL");
-
-    /* kv_base64_encode
-     */
-    errno = 0;
-    ok (kv_base64_encode (NULL) == NULL && errno == EINVAL,
-        "kv_base64_encode kv=NULL fails with EINVAL");
-    s = kv_base64_encode (kv);
-    ok (s != NULL,
-        "kv_base64_encode kv=(empty) works");
-    s = kv_base64_encode (kv);
-    ok (s != NULL,
-        "kv_base64_encode kv=(empty) works a second time");
-
-    /* kv_base64_decode (wraps kv_raw_decode)
-     */
-    errno = 0;
-    ok (kv_base64_decode ("", -1) == NULL && errno == EINVAL,
-        "kv_base64_decode len=-1 fails with EINVAL");
-    errno = 0;
-    ok (kv_base64_decode (NULL, 1) == NULL && errno == EINVAL,
-        "kv_base64_decode buf=NULL len=1 fails with EINVAL");
-    errno = 0;
-    ok (kv_base64_decode (".", 1) == NULL && errno == EINVAL,
-        "kv_base64_decode buf=(illegal base64) fails with EINVAL");
-    errno = 0;
-    /* echo -n a=b | base64 */
-    ok (kv_base64_decode ("YT1i", 4) == NULL && errno == EINVAL,
-        "kv_base64_decode buf=(unterm) fails with EINVAL");
 
     kv_destroy (kv);
     kv_destroy (kv2);

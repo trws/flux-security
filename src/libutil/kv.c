@@ -32,7 +32,6 @@
 #include <stdarg.h>
 #include <assert.h>
 
-#include "base64.h"
 #include "kv.h"
 
 #define KV_CHUNK 4096
@@ -41,7 +40,6 @@ struct kv {
     char *buf;
     int bufsz;
     int len;
-    char *base64;
 };
 
 void kv_destroy (struct kv *kv)
@@ -49,7 +47,6 @@ void kv_destroy (struct kv *kv)
     if (kv) {
         int saved_errno = errno;
         free (kv->buf);
-        free (kv->base64);
         free (kv);
         errno = saved_errno;
     }
@@ -297,59 +294,6 @@ struct kv *kv_raw_decode (const char *buf, int len)
         kv_destroy (kv);
         return NULL;
     }
-    return kv;
-}
-
-const char *kv_base64_encode (const struct kv *kv)
-{
-    char *dst;
-    int dstlen;
-    int rc;
-
-    if (!kv) {
-        errno = EINVAL;
-        return NULL;
-    }
-    dstlen = base64_encode_length (kv->len);
-    if (!(dst = malloc (dstlen)))
-        return NULL;
-    rc = base64_encode_block (dst, &dstlen, kv->buf, kv->len);
-    assert (rc == 0);
-
-    free (kv->base64);
-    /* N.B. cast away const here to allow this function to return
-     * a const value owned by struct kv.  This does not change the "value"
-     * per se, so it is safe.
-     */
-    ((struct kv *)(kv))->base64 = dst;
-    return kv->base64;
-}
-
-struct kv *kv_base64_decode (const char *buf, int len)
-{
-    char *dst;
-    int dstlen;
-    struct kv *kv;
-
-    if (len < 0 || (len > 0 && buf == NULL)) {
-        errno = EINVAL;
-        return NULL;
-    }
-    dstlen = base64_decode_length (len);
-    if (!(dst = malloc (dstlen)))
-        return NULL;
-    if (base64_decode_block (dst, &dstlen, buf, len) < 0) {
-        free (dst);
-        errno = EINVAL;
-        return NULL;
-    }
-    if (!(kv = kv_raw_decode (dst, dstlen))) {
-        int saved_errno = errno;
-        free (dst);
-        errno = saved_errno;
-        return NULL;
-    }
-    free (dst);
     return kv;
 }
 

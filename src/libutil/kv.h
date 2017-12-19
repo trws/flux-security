@@ -38,18 +38,6 @@ int kv_put (struct kv *kv, const char *key, const char *val);
  */
 int kv_get (const struct kv *kv, const char *key, const char **val);
 
-/* Encode kv object as NULL-terminated base64 string (do not free).
- * String remains valid until the next call to kv_base64_encode()
- * or kv_destroy().  Return NULL-terminated base64 string on success,
- * NULL on failure with errno set.
- */
-const char *kv_base64_encode (const struct kv *kv);
-
-/* Decode base64 string to kv object (destroy with kv_destroy).
- * Return kv object on success, NULL on failure with errno set.
- */
-struct kv *kv_base64_decode (const char *s, int len);
-
 /* Access internal binary encoding.
  * Return 0 on success, -1 on failure with errno set.
  */
