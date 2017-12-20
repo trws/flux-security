@@ -68,9 +68,10 @@ cf_t *cf_copy (cf_t *cf)
     return cpy;
 }
 
-static void errprintf (struct cf_error *error,
-                       const char *filename, int lineno,
-                       const char *fmt, ...)
+static void __attribute__ ((format (printf, 4, 5)))
+errprintf (struct cf_error *error,
+           const char *filename, int lineno,
+            const char *fmt, ...)
 {
     va_list ap;
     int saved_errno = errno;
