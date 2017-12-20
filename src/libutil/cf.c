@@ -238,8 +238,7 @@ static int update_object (cf_t *cf,
         goto error;
     }
     if (json_object_update (cf, obj) < 0) {
-        errprintf (error, filename, -1, "updating JSON object: out of memory",
-                   strerror (errno));
+        errprintf (error, filename, -1, "updating JSON object: out of memory");
         errno = ENOMEM;
         goto error;
     }
