@@ -54,11 +54,8 @@ int kv_delete (struct kv *kv, const char *key);
  *   EINVAL - invalid argument
  *   ENOMEM - out of memory
  */
-int kv_put_string (struct kv *kv, const char *key, const char *val);
-int kv_put_int64 (struct kv *kv, const char *key, int64_t val);
-int kv_put_double (struct kv *kv, const char *key, double val);
-int kv_put_bool (struct kv *kv, const char *key, bool val);
-int kv_put_timestamp (struct kv *kv, const char *key, time_t t);
+int kv_vput (struct kv *kv, const char *key, enum kv_type type, va_list ap);
+int kv_put (struct kv *kv, const char *key, enum kv_type type, ...);
 
 /* Find key in kv object and get val (if non-NULL).
  * Return 0 on success, -1 on failure with errno set:
