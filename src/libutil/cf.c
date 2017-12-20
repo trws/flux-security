@@ -27,6 +27,7 @@
 #endif /* HAVE_CONFIG_H */
 #include <errno.h>
 #include <string.h>
+#include <glob.h>
 #include <jansson.h>
 
 #include "src/libtomlc99/toml.h"
@@ -68,9 +69,10 @@ cf_t *cf_copy (cf_t *cf)
     return cpy;
 }
 
-static void errprintf (struct cf_error *error,
-                       const char *filename, int lineno,
-                       const char *fmt, ...)
+static void __attribute__ ((format (printf, 4, 5)))
+errprintf (struct cf_error *error,
+           const char *filename, int lineno,
+            const char *fmt, ...)
 {
     va_list ap;
     int saved_errno = errno;
@@ -238,8 +240,7 @@ static int update_object (cf_t *cf,
         goto error;
     }
     if (json_object_update (cf, obj) < 0) {
-        errprintf (error, filename, -1, "updating JSON object: out of memory",
-                   strerror (errno));
+        errprintf (error, filename, -1, "updating JSON object: out of memory");
         errno = ENOMEM;
         goto error;
     }
@@ -262,6 +263,58 @@ int cf_update (cf_t *cf, const char *buf, int len, struct cf_error *error)
 int cf_update_file (cf_t *cf, const char *filename, struct cf_error *error)
 {
     return update_object (cf, filename, NULL, 0, error);
+}
+
+int cf_update_glob (cf_t *cf, const char *pattern, struct cf_error *error)
+{
+    cf_t *tmp;
+    glob_t gl;
+    size_t i;
+    int count = -1;
+    int errnum = 0;
+    int rc = glob (pattern, GLOB_ERR, NULL, &gl);
+
+    tmp = cf_create ();
+
+    switch (rc) {
+        case 0:
+            count = 0;
+            for (i = 0; i < gl.gl_pathc; i++) {
+                if (cf_update_file (tmp, gl.gl_pathv[i], error) < 0) {
+                    errnum = errno;
+                    count = -1;
+                    break;
+                }
+                count++;
+            }
+            break;
+        case GLOB_NOMATCH:
+            count = 0;
+            errprintf (error, pattern, -1, "No match");
+            break;
+        case GLOB_NOSPACE:
+            errprintf (error, pattern, -1, "Out of memory");
+            errnum = ENOMEM;
+            break;
+        case GLOB_ABORTED:
+            errprintf (error, pattern, -1, "Read error");
+            errnum = EINVAL;
+            break;
+    }
+    globfree (&gl);
+
+    /*
+     *  If glob sucessfully processed at least one file, update
+     *   caller's cf object with all new date in tmp object:
+     */
+    if ((count > 0) &&  json_object_update (cf, tmp) < 0) {
+        errprintf (error, pattern, -1, "updating JSON object: out of memory");
+        errno = ENOMEM;
+        count = -1;
+    }
+    cf_destroy (tmp);
+    errno = errnum;
+    return (count);
 }
 
 static bool is_end_marker (struct cf_option opt)

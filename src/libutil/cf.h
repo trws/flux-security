@@ -89,6 +89,19 @@ int cf_array_size (cf_t *cf);
 int cf_update (cf_t *cf, const char *buf, int len, struct cf_error *error);
 int cf_update_file (cf_t *cf, const char *filename, struct cf_error *error);
 
+/* Update table 'cf' with info parsed from all filenames matching the
+ * wildcard 'pattern', following the rules for the glob(3) function call.
+ * On success returns the number of individual files successfully parsed,
+ * or 0 when there are no files that match 'pattern'.
+ *
+ * If any one file has a non-zero return code from cf_update_file(), then
+ * the entire operation is aborted (no updates are written to 'cf'), and
+ * -1 is returned with errno from cf_update_file() set.
+ *
+ * If error is non-NULL the description of the error is written there.
+ */
+int cf_update_glob (cf_t *cf, const char *pattern, struct cf_error *error);
+
 /* Apply 'opts' to table 'cf' according to flags.
  * On success return 0.  On failure, return -1 with errno set.
  * If error is non-NULL, write error description there.

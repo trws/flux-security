@@ -51,6 +51,19 @@ const struct cf_option opts_multi[] = {
     CF_OPTIONS_TABLE_END,
 };
 
+const struct cf_option opts_combined[] = {
+    { "i", CF_INT64, true },
+    { "d", CF_DOUBLE, true },
+    { "s", CF_STRING, true },
+    { "b", CF_BOOL, true },
+    { "ts", CF_TIMESTAMP, true },
+    { "ai", CF_ARRAY, true },
+    { "tab", CF_TABLE, true },
+    { "tab2", CF_TABLE, true },
+    { "tab3", CF_TABLE, true },
+    CF_OPTIONS_TABLE_END,
+};
+
 static time_t strtotime (const char *s)
 {
     struct tm tm;
@@ -369,25 +382,33 @@ const struct cf_option opts_wrongtype[] = { // for 't1'
     CF_OPTIONS_TABLE_END,
 };
 
-void test_update_file (void)
+static void
+create_test_file (const char *dir, char *prefix, char *path, size_t pathlen,
+                  const char *contents)
 {
-    char path[PATH_MAX + 1];
-    const char *tmpdir = getenv ("TMPDIR");
     int fd;
-    cf_t *cf;
-    struct cf_error error;
-
-    if (!(cf = cf_create ()))
-        BAIL_OUT ("cf_create: %s", strerror (errno));
-
-    snprintf (path, sizeof (path), "%s/cf.XXXXXX", tmpdir ? tmpdir : "/tmp");
-    fd = mkstemp (path);
+    snprintf (path, pathlen, "%s/%s.XXXXXX.toml", dir ? dir : "/tmp", prefix);
+    fd = mkstemps (path, 5);
     if (fd < 0)
         BAIL_OUT ("mkstemp %s: %s", path, strerror (errno));
-    if (write (fd, t1, strlen (t1)) != strlen (t1))
+    if (write (fd, contents, strlen (contents)) != strlen (contents))
         BAIL_OUT ("write %s: %s", path, strerror (errno));
     if (close (fd) < 0)
         BAIL_OUT ("close %s: %s", path, strerror (errno));
+}
+
+
+void test_update_file (void)
+{
+    char path[PATH_MAX + 1];
+
+    cf_t *cf;
+    struct cf_error error;
+
+    create_test_file (getenv ("TMPDIR"), "cf", path, sizeof (path), t1);
+
+    if (!(cf = cf_create ()))
+        BAIL_OUT ("cf_create: %s", strerror (errno));
 
     ok (cf_update_file (cf, path, &error) == 0,
         "cf_update_file works");
@@ -398,6 +419,95 @@ void test_update_file (void)
     if (unlink (path) < 0)
         BAIL_OUT ("unlink %s: %s", path, strerror (errno));
     cf_destroy (cf);
+}
+
+void test_update_glob (void)
+{
+    int rc;
+    const char *tmpdir = getenv ("TMPDIR");
+    char dir[PATH_MAX + 1];
+    char path1[PATH_MAX + 1];
+    char path2[PATH_MAX + 1];
+    char path3[PATH_MAX + 1];
+    char invalid[PATH_MAX + 1];
+    char p [1024];
+
+    cf_t *cf, *cf2, *cf3;
+    struct cf_error error;
+
+
+    snprintf (dir, sizeof (dir), "%s/cf.XXXXXXX", tmpdir ? tmpdir : "/tmp");
+    if (!mkdtemp (dir))
+        BAIL_OUT ("mkdtemp %s: %s", dir, strerror (errno));
+
+    create_test_file (dir, "01", path1, sizeof (path1), t1);
+    create_test_file (dir, "02", path2, sizeof (path2), tab2);
+    create_test_file (dir, "03", path3, sizeof (path3), tab3);
+
+    if (!(cf = cf_create ()))
+        BAIL_OUT ("cf_create: %s", strerror (errno));
+
+    snprintf (p, sizeof (p), "%s/*.toml", dir);
+
+    ok (cf_update_glob (cf, p, &error) == 3, 
+        "cf_update_glob successfully parsed 3 files");
+
+    /* Check the cf object against 'opts'.
+     * All keys and their types must be declared in 'opts' (CF_STRICT).
+     */
+    rc = cf_check (cf, opts_combined, CF_STRICT, &error);
+    ok (rc == 0, "cf_check t1 worked");
+    cfdiag (rc, "cf_check t1", &error);
+
+    ok ((cf2 = cf_get_in (cf, "tab2")) != NULL,
+        "found tab2 table in cf");
+
+    rc = cf_check (cf2, opts_multi, CF_STRICT, &error);
+    ok (rc == 0, "cf_check tab2 worked");
+    cfdiag (rc, "cf_check tab2", &error);
+
+    ok ((cf3 = cf_get_in (cf, "tab3")) != NULL,
+        "found tab3 table in cf");
+
+    errno = 0;
+    ok ((cf_update_glob (cf, "/noexist*", &error) == 0),
+        "cf_update_glob returns 0 on no match");
+    diag ("%s: %d: %s", error.filename, error.lineno, error.errbuf);
+    like (error.errbuf, "[nN]o [mM]atch", "got expected error text");
+
+
+    errno = 0;
+    ok ((cf_update_glob (cf, "/noexist/*", &error) < 0) && errno == EINVAL,
+        "cf_update_glob fails on read error");
+    diag ("%s: %d: %s", error.filename, error.lineno, error.errbuf);
+    like (error.errbuf, "[rR]ead [eE]rror", "got expected error text");
+
+    cf_destroy (cf);
+
+    /* Now make an invalid file and ensure cf_update_glob() aborts
+     * all updates after any one failure
+     */
+    create_test_file (dir, "99", invalid, sizeof (invalid), "key = \n");
+    cf = cf_create ();
+    ok (cf_update_glob (cf, p, &error) < 0 && errno == EINVAL,
+        "cf_update_glob fails when one file fails to parse");
+    diag ("%s: %d: %s", error.filename, error.lineno, error.errbuf);
+    like (error.filename, "99.*\\.toml",
+          "Failed file contained in error.filename");
+
+    ok (cf_get_in (cf, "i") == NULL,
+        "keys from ok files not added to cf table when one file fails");
+
+    cf_destroy (cf);
+
+    if (   (unlink (path1) < 0)
+        || (unlink (path2) < 0)
+        || (unlink (path3) < 0)
+        || (unlink (invalid) < 0) )
+        BAIL_OUT ("unlink: %s", strerror (errno));
+    if (rmdir (dir) < 0)
+        BAIL_OUT ("rmdir: %s: %s", dir, strerror (errno));
+
 }
 
 void test_check (void)
@@ -456,6 +566,7 @@ int main (int argc, char *argv[])
     test_multi ();
     test_corner ();
     test_update_file ();
+    test_update_glob ();
     test_check ();
 
     done_testing ();
