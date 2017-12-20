@@ -55,7 +55,7 @@ static void simple_test (void)
     ok (kv_put (kv, "a", KV_STRING, "foo") == 0,
         "kv_put a=foo works");
     ok (kv_get (kv, "a", KV_STRING, &s) == 0 && !strcmp (s, "foo"),
-        "kv_get a retrieves correct value: %s", s);
+        "kv_get a retrieves correct value");
     ok (kv_put (kv, "b", KV_INT64, 42LL) == 0,
         "kv_put b=42 works");
     ok (kv_put (kv, "c", KV_DOUBLE, 3.14) == 0,
