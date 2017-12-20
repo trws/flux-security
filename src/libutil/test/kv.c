@@ -54,8 +54,8 @@ static void simple_test (void)
         "kv_create works");
     ok (kv_put_string (kv, "a", "foo") == 0,
         "kv_put a=foo works");
-    ok (kv_get_string (kv, "a", &s) == 0 && !strcmp (s, "foo"),
-        "kv_get_string a retrieves correct value: %s", s);
+    ok (kv_get (kv, "a", KV_STRING, &s) == 0 && !strcmp (s, "foo"),
+        "kv_get a retrieves correct value: %s", s);
     ok (kv_put_int64 (kv, "b", 42) == 0,
         "kv_put_int64 b=42 works");
     ok (kv_put_double (kv, "c", 3.14) == 0,
@@ -66,19 +66,19 @@ static void simple_test (void)
         "kv_put_timestamp e=(now) works");
     diag_kv (kv);
 
-    ok (kv_get_string (kv, "a", &s) == 0 && !strcmp (s, "foo"),
-        "kv_get_string a retrieves correct value");
-    ok (kv_get_int64 (kv, "b", &i) == 0 && i == 42,
-        "kv_get_int64 b retrieves correct value");
-    ok (kv_get_double (kv, "c", &d) == 0 && d == 3.14,
-        "kv_get_double c retrieves correct value");
-    ok (kv_get_bool (kv, "d", &b) == 0 && b == true,
-        "kv_get_bool d retrieves correct value");
-    ok (kv_get_timestamp (kv, "e", &t) == 0 && t == now,
-        "kv_get_timestamp e retrieves correct value");
+    ok (kv_get (kv, "a", KV_STRING, &s) == 0 && !strcmp (s, "foo"),
+        "kv_get a retrieves correct value");
+    ok (kv_get (kv, "b", KV_INT64, &i) == 0 && i == 42,
+        "kv_get b retrieves correct value");
+    ok (kv_get (kv, "c", KV_DOUBLE, &d) == 0 && d == 3.14,
+        "kv_get c retrieves correct value");
+    ok (kv_get (kv, "d", KV_BOOL, &b) == 0 && b == true,
+        "kv_get d retrieves correct value");
+    ok (kv_get (kv, "e", KV_TIMESTAMP, &t) == 0 && t == now,
+        "kv_get e retrieves correct value");
     errno = 0;
-    ok (kv_get_string (kv, "f", &s) < 0 && errno == ENOENT,
-        "kv_get_string f fails with ENOENT");
+    ok (kv_get (kv, "f", KV_STRING, &s) < 0 && errno == ENOENT,
+        "kv_get f fails with ENOENT");
 
     /* Iterate over entries.
      */
@@ -201,11 +201,11 @@ static void check_expansion (void)
     for (i = 0; i < 100; i++) {
         snprintf (keybuf, sizeof (keybuf), "key%032d", i);
         snprintf (valbuf, sizeof (valbuf), "%032d", i);
-        if (kv_get_string (kv, keybuf, &s) < 0 || strcmp (s, valbuf) != 0)
+        if (kv_get (kv, keybuf, KV_STRING, &s) < 0 || strcmp (s, valbuf) != 0)
             break;
     }
     ok (i == 100,
-        "kv_get_string verified 100 69-byte entries");
+        "kv_get verified 100 69-byte entries");
 
     kv_destroy (kv);
 }
@@ -264,17 +264,16 @@ static void bad_parameters (void)
     ok (kv_put_timestamp (kv, "foo", -1) < 0 && errno == EINVAL,
         "kv_put_timestamp val=-1 fails with EINVAL");
 
-    /* kv_get_*
-     * bad params caught with type independent common code
+    /* kv_get
      */
     errno = 0;
-    ok (kv_get_string (NULL, "foo", &s) < 0 && errno == EINVAL,
-        "kv_get_string kv=NULL fails with EINVAL");
+    ok (kv_get (NULL, "foo", KV_STRING, &s) < 0 && errno == EINVAL,
+        "kv_get kv=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_get_string (kv, NULL, &s) < 0 && errno == EINVAL,
-        "kv_get_string key=NULL fails with EINVAL");
+    ok (kv_get (kv, NULL, KV_STRING, &s) < 0 && errno == EINVAL,
+        "kv_get key=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_get_string (kv, "", &s) < 0 && errno == EINVAL,
+    ok (kv_get (kv, "", KV_STRING, &s) < 0 && errno == EINVAL,
         "kv_get_string key="" fails with EINVAL");
 
     /* iteration
@@ -370,8 +369,8 @@ void key_update (void)
      */
     ok (kv_put_string (kv, "foo", "baz") == 0,
         "kv_put_string foo=baz works");
-    ok (kv_get_string (kv, "foo", &val) == 0 && !strcmp (val, "baz"),
-        "kv_get_string foo returns baz");
+    ok (kv_get (kv, "foo", KV_STRING, &val) == 0 && !strcmp (val, "baz"),
+        "kv_get foo returns baz");
 
     ok (kv_put_string (kv, "bar", "xxx") == 0,
         "kv_put_string bar=xxx works");
@@ -380,15 +379,15 @@ void key_update (void)
      */
     ok (kv_put_string (kv, "foo", "yyy") == 0,
         "kv_put_string foo=yyy works");
-    ok (kv_get_string (kv, "foo", &val) == 0 && !strcmp (val, "yyy"),
-        "kv_get_string foo returns yyy");
+    ok (kv_get (kv, "foo", KV_STRING, &val) == 0 && !strcmp (val, "yyy"),
+        "kv_get foo returns yyy");
 
     /* Update second (of two) entry
      */
     ok (kv_put_string (kv, "bar", "zzz") == 0,
         "kv_put_string bar=zzz works");
-    ok (kv_get_string (kv, "bar", &val) == 0 && !strcmp (val, "zzz"),
-        "kv_get_string bar returns zzz");
+    ok (kv_get (kv, "bar", KV_STRING, &val) == 0 && !strcmp (val, "zzz"),
+        "kv_get bar returns zzz");
 
     ok (kv_put_string (kv, "baz", "qqq") == 0,
         "kv_put_string baz=qqq works");
@@ -397,8 +396,8 @@ void key_update (void)
      */
     ok (kv_put_string (kv, "bar", "111") == 0,
         "kv_put_string bar=111 works");
-    ok (kv_get_string (kv, "bar", &val) == 0 && !strcmp (val, "111"),
-        "kv_get_string bar returns 111");
+    ok (kv_get (kv, "bar", KV_STRING, &val) == 0 && !strcmp (val, "111"),
+        "kv_get bar returns 111");
 
     kv_destroy (kv);
 }

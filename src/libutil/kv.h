@@ -65,11 +65,9 @@ int kv_put_timestamp (struct kv *kv, const char *key, time_t t);
  *   EINVAL - invalid argument
  *   ENOENT - key of requested type not found
  */
-int kv_get_string (const struct kv *kv, const char *key, const char **val);
-int kv_get_int64 (const struct kv *kv, const char *key, int64_t *val);
-int kv_get_double (const struct kv *kv, const char *key, double *val);
-int kv_get_bool (const struct kv *kv, const char *key, bool *val);
-int kv_get_timestamp (const struct kv *kv, const char *key, time_t *val);
+int kv_vget (const struct kv *kv, const char *key,
+             enum kv_type type, va_list ap);
+int kv_get (const struct kv *kv, const char *key, enum kv_type type, ...);
 
 /* Access internal binary encoding.
  * Return 0 on success, -1 on failure with errno set.

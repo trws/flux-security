@@ -33,6 +33,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <time.h>
+#include <stdarg.h>
 #include <assert.h>
 
 #include "kv.h"
@@ -328,54 +329,59 @@ enum kv_type kv_typeof (const char *key)
     }
 }
 
-int kv_get_string (const struct kv *kv, const char *key, const char **val)
+int kv_vget (const struct kv *kv, const char *key,
+             enum kv_type type, va_list ap)
 {
-    const char *entry = kv_find (kv, key, KV_STRING);
+    const char *entry = kv_find (kv, key, type);
     if (!entry)
         return -1;
-    if (val)
-        *val = kv_val_string (entry);
+    switch (type) {
+        case KV_STRING: {
+            const char **val = va_arg (ap, const char **);
+            if (val)
+                *val = kv_val_string (entry);
+            break;
+        }
+        case KV_INT64: {
+            int64_t *val = va_arg (ap, int64_t *);
+            if (val)
+                *val = kv_val_int64 (entry);
+            break;
+        }
+        case KV_DOUBLE: {
+            double *val = va_arg (ap, double *);
+            if (val)
+                *val = kv_val_double (entry);
+            break;
+        }
+        case KV_BOOL: {
+            bool *val = va_arg (ap, bool *);
+            if (val)
+                *val = kv_val_bool (entry);
+            break;
+        }
+        case KV_TIMESTAMP: {
+            time_t *val = va_arg (ap, time_t *);
+            if (val)
+                *val = kv_val_timestamp (entry);
+            break;
+        }
+        default:
+            errno = EINVAL;
+            return -1;
+    }
     return 0;
 }
 
-int kv_get_int64 (const struct kv *kv, const char *key, int64_t *val)
+int kv_get (const struct kv *kv, const char *key, enum kv_type type, ...)
 {
-    const char *entry = kv_find (kv, key, KV_INT64);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_int64 (entry);
-    return 0;
-}
+    va_list ap;
+    int rc;
 
-int kv_get_double (const struct kv *kv, const char *key, double *val)
-{
-    const char *entry = kv_find (kv, key, KV_DOUBLE);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_double (entry);
-    return 0;
-}
-
-int kv_get_bool (const struct kv *kv, const char *key, bool *val)
-{
-    const char *entry = kv_find (kv, key, KV_BOOL);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_bool (entry);
-    return 0;
-}
-
-int kv_get_timestamp (const struct kv *kv, const char *key, time_t *val)
-{
-    const char *entry = kv_find (kv, key, KV_TIMESTAMP);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_timestamp (entry);
-    return 0;
+    va_start (ap, type);
+    rc = kv_vget (kv, key, type, ap);
+    va_end (ap);
+    return rc;
 }
 
 /* Validate a just-decoded kv buffer.
