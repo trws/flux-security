@@ -29,6 +29,7 @@ struct kv *kv_copy (const struct kv *kv);
 
 /* Add kv2 entries to kv1, prepending 'prefix' to its keys (if non-NULL).
  * When there are key conflicts, values from kv2 override kv1.
+ * Return 0 on success, -1 on failure with errno set.
  */
 int kv_join (struct kv *kv1, const struct kv *kv2, const char *prefix);
 
@@ -50,6 +51,8 @@ bool kv_equal (const struct kv *kv1, const struct kv *kv2);
 int kv_delete (struct kv *kv, const char *key);
 
 /* Add key=val to kv object.
+ * N.B. take care that KV_INT64 and KV_TIMESTAMP arguments are the expected
+ * size, remembering that default integer argument promotion is to "int".
  * Return 0 on success, -1 on failure with errno set:
  *   EINVAL - invalid argument
  *   ENOMEM - out of memory
