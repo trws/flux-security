@@ -434,7 +434,7 @@ inval:
     return -1;
 }
 
-int kv_raw_encode (const struct kv *kv, const char **buf, int *len)
+int kv_encode (const struct kv *kv, const char **buf, int *len)
 {
     if (!kv || !buf || !len) {
         errno = EINVAL;
@@ -445,7 +445,7 @@ int kv_raw_encode (const struct kv *kv, const char **buf, int *len)
     return 0;
 }
 
-struct kv *kv_raw_decode (const char *buf, int len)
+struct kv *kv_decode (const char *buf, int len)
 {
     struct kv *kv;
 

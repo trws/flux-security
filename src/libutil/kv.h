@@ -72,12 +72,12 @@ int kv_get (const struct kv *kv, const char *key, enum kv_type type, ...);
 /* Access internal binary encoding.
  * Return 0 on success, -1 on failure with errno set.
  */
-int kv_raw_encode (const struct kv *kv, const char **buf, int *len);
+int kv_encode (const struct kv *kv, const char **buf, int *len);
 
 /* Create kv object from binary encoding.
  * Return kv object on success, NULL on failure with errno set.
  */
-struct kv *kv_raw_decode (const char *buf, int len);
+struct kv *kv_decode (const char *buf, int len);
 
 /* Iteration example:
  *

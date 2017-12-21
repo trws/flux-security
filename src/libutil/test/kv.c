@@ -17,7 +17,7 @@ static void diag_kv (struct kv *kv)
     int len;
     int i;
 
-    if (kv_raw_encode (kv, &buf, &len) < 0)
+    if (kv_encode (kv, &buf, &len) < 0)
         BAIL_OUT ("diag_kv: %s", strerror (errno));
     printf ("# ");
     for (i = 0; i < len; i++) {
@@ -135,11 +135,11 @@ static void simple_test (void)
 
     /* Create a new copy through raw "codec" and check for equality.
      */
-    ok (kv_raw_encode (kv, &s, &len) == 0,
-        "kv_raw_encode works");
-    kv3 = kv_raw_decode (s, len);
+    ok (kv_encode (kv, &s, &len) == 0,
+        "kv_encode works");
+    kv3 = kv_decode (s, len);
     ok (kv3 != NULL,
-        "kv_raw_decode works");
+        "kv_decode works");
     ok (kv_equal (kv, kv3),
         "kv_equal says new copy is identical");
 
@@ -159,12 +159,12 @@ static void empty_object (void)
         "kv_create works");
     ok (kv_next (kv, NULL) == NULL,
         "kv_next key=NULL returns NULL");
-    ok (kv_raw_encode (kv, &buf, &len) == 0,
-        "kv_raw_encode works");
+    ok (kv_encode (kv, &buf, &len) == 0,
+        "kv_encode works");
 
-    kv2 = kv_raw_decode (buf, len);
+    kv2 = kv_decode (buf, len);
     ok (kv2 != NULL,
-        "kv_raw_decode works");
+        "kv_decode works");
     ok (kv_equal (kv, kv2),
         "kv_equal says they are identical");
 
@@ -300,35 +300,35 @@ static void bad_parameters (void)
     ok (kv_val_timestamp (NULL) == 0.,
         "kv_val_timestamp key=NULL returns 0");
 
-    /* kv_raw_encode
+    /* kv_encode
      */
     errno = 0;
-    ok (kv_raw_encode (NULL, &s, &len) < 0 && errno == EINVAL,
-        "kv_raw_encode kv=NULL fails with EINVAL");
+    ok (kv_encode (NULL, &s, &len) < 0 && errno == EINVAL,
+        "kv_encode kv=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_raw_encode (kv, NULL, &len) < 0 && errno == EINVAL,
-        "kv_raw_encode buf=NULL fails with EINVAL");
+    ok (kv_encode (kv, NULL, &len) < 0 && errno == EINVAL,
+        "kv_encode buf=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_raw_encode (kv, &s, NULL) < 0 && errno == EINVAL,
-        "kv_raw_encode len=NULL fails with EINVAL");
+    ok (kv_encode (kv, &s, NULL) < 0 && errno == EINVAL,
+        "kv_encode len=NULL fails with EINVAL");
 
-    /* kv_raw_decode
+    /* kv_decode
      */
     errno = 0;
-    ok (kv_raw_decode ("foo\0sbar\0", -1) == NULL && errno == EINVAL,
-        "kv_raw_decode len=-1 fails with EINVAL");
+    ok (kv_decode ("foo\0sbar\0", -1) == NULL && errno == EINVAL,
+        "kv_decode len=-1 fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode (NULL, 1) == NULL && errno == EINVAL,
-        "kv_raw_decode buf=NULL len=1 fails with EINVAL");
+    ok (kv_decode (NULL, 1) == NULL && errno == EINVAL,
+        "kv_decode buf=NULL len=1 fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode ("foo\0sbar", 8) == NULL && errno == EINVAL,
-        "kv_raw_decode buf=(unterm) fails with EINVAL");
+    ok (kv_decode ("foo\0sbar", 8) == NULL && errno == EINVAL,
+        "kv_decode buf=(unterm) fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode ("foo\0sbar\0foobar\0", 16) == NULL && errno == EINVAL,
-        "kv_raw_decode buf=(no delim entry) fails with EINVAL");
+    ok (kv_decode ("foo\0sbar\0foobar\0", 16) == NULL && errno == EINVAL,
+        "kv_decode buf=(no delim entry) fails with EINVAL");
     errno = 0;
-    ok (kv_raw_decode ("foo\0sbar\0\0sfoobar\0", 18) == NULL && errno == EINVAL,
-        "kv_raw_decode buf=(empty key entry) fails with EINVAL");
+    ok (kv_decode ("foo\0sbar\0\0sfoobar\0", 18) == NULL && errno == EINVAL,
+        "kv_decode buf=(empty key entry) fails with EINVAL");
 
     kv_destroy (kv);
     kv_destroy (kv2);
