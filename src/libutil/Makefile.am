@@ -27,7 +27,9 @@ libutil_la_SOURCES = \
 	kv.c \
 	kv.h \
 	sigcert.c \
-	sigcert.h
+	sigcert.h \
+	timestamp.c \
+	timestamp.h
 
 TESTS = \
 	test_base64.t \
