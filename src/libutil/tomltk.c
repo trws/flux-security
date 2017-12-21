@@ -34,6 +34,7 @@
 #include <jansson.h>
 
 #include "src/libtomlc99/toml.h"
+#include "timestamp.h"
 #include "tomltk.h"
 
 static int table_to_json (toml_table_t *tab, json_t **op);
@@ -78,34 +79,6 @@ static void errfromtoml (struct tomltk_error *error,
     }
 }
 
-/* Convert time_t (GMT) to ISO 8601 timestamp string,
- * e.g. "2003-08-24T05:14:50Z"
- */
-static int timetostr (time_t t, char *buf, int size)
-{
-    struct tm tm;
-    if (t < 0 || !gmtime_r (&t, &tm))
-        return -1;
-    if (strftime (buf, size, "%FT%TZ", &tm) == 0)
-        return -1;
-    return 0;
-}
-
-/* Convert from ISO 8601 string to time_t.
- */
-static int strtotime (const char *s, time_t *tp)
-{
-    struct tm tm;
-    time_t t;
-    if (!strptime (s, "%FT%TZ", &tm))
-        return -1;
-    if ((t = timegm (&tm)) < 0)
-        return -1;
-    if (tp)
-        *tp = t;
-    return 0;
-}
-
 /* Convert from TOML timestamp to struct tm (POSIX broken out time).
  */
 static int tstotm (toml_timestamp_t *ts, struct tm *tm)
@@ -145,7 +118,7 @@ int tomltk_json_to_epoch (json_t *obj, time_t *tp)
         errno = EINVAL;
         return -1;
     }
-    if (strtotime (s, tp) < 0) {
+    if (timestamp_fromstr (s, tp) < 0) {
         errno = EINVAL;
         return -1;
     }
@@ -157,7 +130,7 @@ json_t *tomltk_epoch_to_json (time_t t)
     char timebuf[80];
     json_t *obj;
 
-    if (timetostr (t, timebuf, sizeof (timebuf)) < 0) {
+    if (timestamp_tostr (t, timebuf, sizeof (timebuf)) < 0) {
         errno = EINVAL;
         return NULL;
     }

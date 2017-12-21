@@ -27,6 +27,14 @@ void sigcert_destroy (struct sigcert *cert);
  */
 struct sigcert *sigcert_create (void);
 
+/* Copy cert.
+ */
+struct sigcert *sigcert_copy (struct sigcert *cert);
+
+/* Drop secret key from cert.
+ */
+void sigcert_forget_secret (struct sigcert *cert);
+
 /* Load cert from file 'name.pub'.
  * If secret=true, load secret-key from 'name' also.
  */
@@ -36,13 +44,13 @@ struct sigcert *sigcert_load (const char *name, bool secret);
  */
 int sigcert_store (const struct sigcert *cert, const char *name);
 
-/* Decode JSON string to cert.
+/* Decode kv buffer to cert.
  */
-struct sigcert *sigcert_json_loads (const char *s);
+struct sigcert *sigcert_decode (const char *s, int len);
 
-/* Encode public cert to JSON string.  Caller must free.
+/* Encode cert to kv buffer.
  */
-char *sigcert_json_dumps (const struct sigcert *cert);
+int sigcert_encode (const struct sigcert *cert, const char **bp, int *len);
 
 /* Return true if two certificates have the same keys.
  */
@@ -74,29 +82,30 @@ int sigcert_sign_cert (const struct sigcert *cert1,
 int sigcert_verify_cert (const struct sigcert *cert1,
                          const struct sigcert *cert2);
 
-
 /* Get/set metadata
  */
-int sigcert_meta_sets (struct sigcert *cert,
-                       const char *key, const char *value);
-int sigcert_meta_gets (const struct sigcert *cert,
-                       const char *key, const char **value);
-int sigcert_meta_seti (struct sigcert *cert,
-                       const char *key, int64_t value);
-int sigcert_meta_geti (const struct sigcert *cert,
-                       const char *key, int64_t *value);
-int sigcert_meta_setd (struct sigcert *cert,
-                       const char *key, double value);
-int sigcert_meta_getd (const struct sigcert *cert,
-                       const char *key, double *value);
-int sigcert_meta_setb (struct sigcert *cert,
-                       const char *key, bool value);
-int sigcert_meta_getb (const struct sigcert *cert,
-                       const char *key, bool *value);
-int sigcert_meta_setts (struct sigcert *cert,
-                        const char *key, time_t value);
-int sigcert_meta_getts (const struct sigcert *cert,
-                        const char *key, time_t *value);
+enum sigcert_meta_type {
+    SM_UNKNOWN = 0,
+    SM_STRING = 's',
+    SM_INT64 = 'i',
+    SM_DOUBLE = 'd',
+    SM_BOOL = 'b',
+    SM_TIMESTAMP = 't',
+};
+
+/* Set meta value.
+ * N.B. take care that SM_INT64 and SM_TIMESTAMP arguments are the expected
+ * size, remembering that default integer argument promotion is to "int".
+ * Returns 0 on success, -1 on failure with errno set.
+ */
+int sigcert_meta_set (struct sigcert *cert, const char *key,
+                      enum sigcert_meta_type type, ...);
+
+/* Set meta value.
+ * Returns 0 on success, -1 on failure with errno set.
+ */
+int sigcert_meta_get (const struct sigcert *cert, const char *key,
+                      enum sigcert_meta_type type, ...);
 
 #ifdef __cplusplus
 }

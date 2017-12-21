@@ -43,10 +43,10 @@ void generate_cert (const char *target_path)
         die ("sigcert_create");
     if (time (&t) == (time_t)-1)
         die ("time");
-    if (sigcert_meta_setts (cert, "create-time", t) < 0)
-        die ("sigcert_meta_setts");
-    if (sigcert_meta_seti (cert, "userid", getuid ()) < 0)
-        die ("sigcert_meta_seti");
+    if (sigcert_meta_set (cert, "create-time", SM_TIMESTAMP, t) < 0)
+        die ("sigcert_meta_set create-time");
+    if (sigcert_meta_set (cert, "userid", SM_INT64, (int64_t)getuid ()) < 0)
+        die ("sigcert_meta_set userid");
     fprintf (stderr, "keygen: updating %s\n", target_path);
     if (sigcert_store (cert, target_path) < 0)
         die ("sigcert_store");
@@ -68,14 +68,14 @@ void sign_cert (const char *signer_path, const char *target_path)
     if (!(cert2 = sigcert_load (target_path, false)))
         die ("load %s", target_path);
 
-    if (sigcert_meta_geti (cert1, "userid", &userid) < 0)
-        die ("sigcert_meta_setts");
-    if (sigcert_meta_seti (cert2, "ca-userid", userid) < 0)
-        die ("sigcert_meta_setts");
+    if (sigcert_meta_get (cert1, "userid", SM_INT64, &userid) < 0)
+        die ("sigcert_meta_get userid");
+    if (sigcert_meta_set (cert2, "ca-userid", SM_INT64, userid) < 0)
+        die ("sigcert_meta_set ca-userid");
     if (time (&t) == (time_t)-1)
         die ("time");
-    if (sigcert_meta_setts (cert2, "ca-signed-time", t) < 0)
-        die ("sigcert_meta_setts");
+    if (sigcert_meta_set (cert2, "ca-signed-time", SM_TIMESTAMP, t) < 0)
+        die ("sigcert_meta_set ca-signed-time");
 
     if (sigcert_sign_cert (cert1, cert2) < 0)
         die ("sigcert_sign_cert");

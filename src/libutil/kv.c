@@ -36,6 +36,7 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#include "timestamp.h"
 #include "kv.h"
 
 #define KV_CHUNK 4096
@@ -241,11 +242,8 @@ int kv_vput (struct kv *kv, const char *key, enum kv_type type, va_list ap)
             break;
         }
         case KV_TIMESTAMP: {
-            struct tm tm;
             time_t t = va_arg (ap, time_t);
-            if (t < 0 || !gmtime_r (&t, &tm))
-                goto inval;
-             if (strftime (s, sizeof (s), "%FT%TZ", &tm) == 0)
+            if (timestamp_tostr (t, s, sizeof (s)) < 0)
                 goto inval;
             val = s;
             break;
@@ -318,10 +316,9 @@ bool kv_val_bool (const char *key)
 
 time_t kv_val_timestamp (const char *key)
 {
-    struct tm tm;
     time_t t;
     const char *s = kv_val_string (key);
-    if (!strptime (s, "%FT%TZ", &tm) || (t = timegm (&tm)) < 0)
+    if (timestamp_fromstr (s, &t) < 0)
         return 0;
     return t;
 }
@@ -437,7 +434,7 @@ inval:
     return -1;
 }
 
-int kv_raw_encode (const struct kv *kv, const char **buf, int *len)
+int kv_encode (const struct kv *kv, const char **buf, int *len)
 {
     if (!kv || !buf || !len) {
         errno = EINVAL;
@@ -448,7 +445,7 @@ int kv_raw_encode (const struct kv *kv, const char **buf, int *len)
     return 0;
 }
 
-struct kv *kv_raw_decode (const char *buf, int len)
+struct kv *kv_decode (const char *buf, int len)
 {
     struct kv *kv;
 

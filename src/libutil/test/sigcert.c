@@ -61,13 +61,6 @@ static void cleanup_keypath (const char *name)
     (void)unlink (path);
 }
 
-static void diag_cert (const char *prefix, struct sigcert *cert)
-{
-    char *s = sigcert_json_dumps (cert);
-    diag ("%s: %s", prefix, s ? s : strerror (errno));
-    free (s);
-}
-
 void test_meta (void)
 {
     struct sigcert *cert;
@@ -81,28 +74,28 @@ void test_meta (void)
     cert = sigcert_create ();
     ok (cert != NULL,
         "sigcert_create works");
-    ok (sigcert_meta_sets (cert, "foo", "bar") == 0,
-        "sigcert_meta_sets foo=bar");
-    ok (sigcert_meta_seti (cert, "baz", 42) == 0,
-        "sigcert_meta_seti baz=42");
-    ok (sigcert_meta_setd (cert, "bar", 3.14159) == 0,
-        "sigcert_meta_setd bar=3.14159");
-    ok (sigcert_meta_setb (cert, "baf", true) == 0,
-        "sigcert_meta_setd baf=true");
-    ok (sigcert_meta_setts (cert, "ts", tnow) == 0,
-        "sigcert_meta_setd ts=true");
-    ok (sigcert_meta_gets (cert, "foo", &s) == 0
+    ok (sigcert_meta_set (cert, "foo", SM_STRING, "bar") == 0,
+        "sigcert_meta_set foo=bar");
+    ok (sigcert_meta_set (cert, "baz", SM_INT64, 42LL) == 0,
+        "sigcert_meta_set baz=42");
+    ok (sigcert_meta_set (cert, "bar", SM_DOUBLE, 3.14159) == 0,
+        "sigcert_meta_set bar=3.14159");
+    ok (sigcert_meta_set (cert, "baf", SM_BOOL, true) == 0,
+        "sigcert_meta_set baf=true");
+    ok (sigcert_meta_set (cert, "ts", SM_TIMESTAMP, tnow) == 0,
+        "sigcert_meta_set ts=(now)");
+    ok (sigcert_meta_get (cert, "foo", SM_STRING, &s) == 0
         && !strcmp (s, "bar"),
-        "sigcert_meta_gets foo works");
-    ok (sigcert_meta_geti (cert, "baz", &i) == 0
+        "sigcert_meta_get foo works");
+    ok (sigcert_meta_get (cert, "baz", SM_INT64, &i) == 0
         && i == 42,
-        "sigcert_meta_geti baz works");
-    ok (sigcert_meta_getd (cert, "bar", &d) == 0 && d == 3.14159,
-        "sigcert_meta_getd bar works");
-    ok (sigcert_meta_getb (cert, "baf", &b) == 0 && b == true,
-        "sigcert_meta_getb baf works");
-    ok (sigcert_meta_getts (cert, "ts", &t) == 0 && t == tnow,
-        "sigcert_meta_getts ts works");
+        "sigcert_meta_get baz works");
+    ok (sigcert_meta_get (cert, "bar", SM_DOUBLE, &d) == 0 && d == 3.14159,
+        "sigcert_meta_get bar works");
+    ok (sigcert_meta_get (cert, "baf", SM_BOOL, &b) == 0 && b == true,
+        "sigcert_meta_get baf works");
+    ok (sigcert_meta_get (cert, "ts", SM_TIMESTAMP, &t) == 0 && t == tnow,
+        "sigcert_meta_get ts works");
 
     sigcert_destroy (cert);
 }
@@ -128,22 +121,20 @@ void test_load_store (void)
      * Load it back into a different cert, and make sure keys are the same.
      */
     name = new_keypath ("test");
-    ok (sigcert_meta_sets (cert, "foo", "bar") == 0,
-        "sigcert_meta_sets foo=bar");
-    ok (sigcert_meta_seti (cert, "bar", -55) == 0,
-        "sigcert_meta_seti bar=-55");
-    ok (sigcert_meta_setd (cert, "baz", 2.718) == 0,
-        "sigcert_meta_setd baz=2.718");
-    ok (sigcert_meta_setb (cert, "flag", false) == 0,
-        "sigcert_meta_setb flag=false");
-    ok (sigcert_meta_setts (cert, "time", time (NULL)) == 0,
-        "sigcert_meta_setts time=now");
+    ok (sigcert_meta_set (cert, "foo", SM_STRING, "bar") == 0,
+        "sigcert_meta_set foo=bar");
+    ok (sigcert_meta_set (cert, "bar", SM_INT64, -55LL) == 0,
+        "sigcert_meta_set bar=-55");
+    ok (sigcert_meta_set (cert, "baz", SM_DOUBLE, 2.718) == 0,
+        "sigcert_meta_set baz=2.718");
+    ok (sigcert_meta_set (cert, "flag", SM_BOOL, false) == 0,
+        "sigcert_meta_set flag=false");
+    ok (sigcert_meta_set (cert, "time", SM_TIMESTAMP, time (NULL)) == 0,
+        "sigcert_meta_set time=(now)");
     ok (sigcert_store (cert, name) == 0,
         "sigcert_store test, test.pub worked");
     ok ((cert2 = sigcert_load (name, true)) != NULL,
         "sigcert_load test worked");
-    diag_cert ("cert", cert);
-    diag_cert ("cert2", cert2);
     ok (sigcert_equal (cert, cert2) == true,
         "loaded cert is same as the original");
     sigcert_destroy (cert2);
@@ -216,14 +207,16 @@ void test_sign_verify (void)
         BAIL_OUT ("sigcert_create: %s", strerror (errno));
 
     /* Sign message with cert1.
-     * Verify message with cert1.
-     * Demonstrate cert2 cannot verify message.
-     * Demonstrate cert1 fails to verify if message changes.
      */
     sig = sigcert_sign (cert1, message, sizeof (message));
     ok (sig != NULL,
         "sigcert_sign works");
     diag ("%s", sig ? sig : "NULL");
+
+    /* Verify with cert1.
+     * cert2 cannot verify message signed by cert1.
+     * cert1 cannot verify tampered message.
+     */
     ok (sigcert_verify (cert1, sig, message, sizeof (message)) == 0,
         "sigcert_verify cert=good works");
     errno = 0;
@@ -262,107 +255,70 @@ void test_sign_verify (void)
     sigcert_destroy (cert2);
 }
 
-void test_json_load_dump_sign (void)
-{
-    struct sigcert *cert;
-    struct sigcert *cert_pub;
-    char *s, *sig;
-    uint8_t message[] = "bad-kitty-my-pot-pie";
-
-    if (!(cert = sigcert_create ()))
-        BAIL_OUT ("sigcert_create: %s", strerror (errno));
-
-    /* dump/load through JSON functions, creating a second cert with
-     * public key only
-     */
-    s = sigcert_json_dumps (cert);
-    ok (s != NULL,
-        "sigcert_json_dumps works");
-    cert_pub = sigcert_json_loads (s);
-    ok (cert_pub != NULL,
-        "sigcert_json_loads works");
-
-    /* sign with cert, verify with public cert
-     */
-    if (!(sig = sigcert_sign (cert, message, sizeof (message))))
-        BAIL_OUT ("sigcert_sign: %s", strerror (errno));
-    ok (sigcert_verify (cert_pub, sig, message, sizeof (message)) == 0,
-        "verified sig with pub cert after json_dumps/loads");
-
-    free (sig);
-    free (s);
-    sigcert_destroy (cert);
-    sigcert_destroy (cert_pub);
-}
-
-void test_json_load_dump (void)
+void test_codec (void)
 {
     struct sigcert *cert;
     struct sigcert *cert_pub;
     struct sigcert *cert2;
-    char *s;
-    const char *name;
+    const char *s;
+    int len;
 
-    /* Store a cert to test, test.pub, then load cert_pub with
-     * only the public key.
+    /* Create cert, cert_pub
      */
-    name = new_keypath ("test");
     if (!(cert = sigcert_create ()))
         BAIL_OUT ("sigcert_create");
-    ok (sigcert_meta_sets (cert, "foo", "bar") == 0,
-        "sigcert_meta_sets foo=bar");
-    ok (sigcert_meta_seti (cert, "bar", 42) == 0,
-        "sigcert_meta_seti bar=42");
-    ok (sigcert_meta_setd (cert, "baz", 42e-27) == 0,
-        "sigcert_meta_setd bar=42");
-    ok (sigcert_meta_setb (cert, "nerf", true) == 0,
-        "sigcert_meta_setb nerf=true");
-    ok (sigcert_meta_setts (cert, "time", time (NULL)) == 0,
-        "sigcert_meta_setb time=now");
-    if (sigcert_store (cert, name) < 0)
-        BAIL_OUT ("sigcert_store");
-    ok ((cert_pub = sigcert_load (name, false)) != NULL,
-        "sigcert_load test.pub worked");
+    ok (sigcert_meta_set (cert, "foo", SM_STRING, "bar") == 0,
+        "sigcert_meta_set foo=bar");
+    ok (sigcert_meta_set (cert, "bar", SM_INT64, 42LL) == 0,
+        "sigcert_meta_set bar=42");
+    ok (sigcert_meta_set (cert, "baz", SM_DOUBLE, 42e-27) == 0,
+        "sigcert_meta_set bar=42");
+    ok (sigcert_meta_set (cert, "nerf", SM_BOOL, true) == 0,
+        "sigcert_meta_set nerf=true");
+    ok (sigcert_meta_set (cert, "time", SM_TIMESTAMP, time (NULL)) == 0,
+        "sigcert_meta_set time=(now)");
+    cert_pub = sigcert_copy (cert);
+    ok (cert_pub != NULL,
+        "sigcert_copy worked");
+    sigcert_forget_secret (cert_pub);
 
-    /* Dump cert_pub to json string, then load cert2 from
-     * json_string, and test cert_pub and cert2 for equality.
+    /* Encode cert_pub, then decode as cert2.
+     * Test for equality.
      * Everything was properly marshaled.
      */
-    s = sigcert_json_dumps (cert_pub);
-    ok (s != NULL,
-        "sigcert_json_dumps works");
-    cert2 = sigcert_json_loads (s);
+    ok (sigcert_encode (cert_pub, &s, &len) == 0,
+        "sigcert_encode works");
+    cert2 = sigcert_decode (s, len);
+    if (!cert2)
+        diag ("sigcert_decode: %s", strerror (errno));
     ok (cert2 != NULL,
-        "sigcert_json_loads works");
+        "sigcert_decode works");
     ok (sigcert_equal (cert2, cert_pub) == true,
         "the two certs are equal");
-    diag ("%s", s);
 
-    free (s);
     sigcert_destroy (cert);
     sigcert_destroy (cert_pub);
     sigcert_destroy (cert2);
-
-    cleanup_keypath ("test");
-    cleanup_keypath ("test.pub");
 }
 
 void test_corner (void)
 {
     struct sigcert *cert;
+    const char *s;
+    int len;
 
     if (!(cert = sigcert_create ()))
         BAIL_OUT ("sigcert_create: %s", strerror (errno));
-    if (sigcert_meta_sets (cert, "test-s", "foo") < 0)
-        BAIL_OUT ("meta_sets failed");
-    if (sigcert_meta_seti (cert, "test-i", 42) < 0)
-        BAIL_OUT ("meta_seti failed");
-    if (sigcert_meta_setd (cert, "test-d", 3.14) < 0)
-        BAIL_OUT ("meta_setd failed");
-    if (sigcert_meta_setb (cert, "test-b", true) < 0)
-        BAIL_OUT ("meta_setb failed");
-    if (sigcert_meta_setts (cert, "test-ts", time (NULL)) < 0)
-        BAIL_OUT ("meta_setts failed");
+    if (sigcert_meta_set (cert, "test-s", SM_STRING, "foo") < 0)
+        BAIL_OUT ("meta_set failed");
+    if (sigcert_meta_set (cert, "test-i", SM_INT64, 42LL) < 0)
+        BAIL_OUT ("meta_set failed");
+    if (sigcert_meta_set (cert, "test-d", SM_DOUBLE, 3.14) < 0)
+        BAIL_OUT ("meta_set failed");
+    if (sigcert_meta_set (cert, "test-b", SM_BOOL, true) < 0)
+        BAIL_OUT ("meta_set failed");
+    if (sigcert_meta_set (cert, "test-ts", SM_TIMESTAMP, time (NULL)) < 0)
+        BAIL_OUT ("meta_set failed");
 
     /* Load/store corner cases
      */
@@ -418,222 +374,145 @@ void test_corner (void)
     ok (sigcert_verify (cert, "....", NULL, 0) < 0 && errno == EINVAL,
         "sigcert_verify sig=invalid fails with EINVAL");
 
-    /* json_dumps/loads corner cases
+    /* encode/decode corner cases
      */
     errno = 0;
-    ok (sigcert_json_dumps (NULL) == NULL && errno == EINVAL,
-        "sigcert_json_dumps cert=NULL fails with EINVAL");
+    ok (sigcert_encode (NULL, &s, &len) < 0 && errno == EINVAL,
+        "sigcert_encode cert=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_json_loads (NULL) == NULL && errno == EINVAL,
-        "sigcert_json_loads s=NULL fails with EINVAL");
+    ok (sigcert_decode (NULL, 0) == NULL && errno == EINVAL,
+        "sigcert_decode s=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_json_loads ("") == NULL && errno == EPROTO,
-        "sigcert_json_loads s=empty fails with EPROTO");
-    errno = 0;
-    ok (sigcert_json_loads ("{") == NULL && errno == EPROTO,
-        "sigcert_json_loads s=invalid fails with EPROTO");
-    errno = 0;
-    ok (sigcert_json_loads ("{\"curve\":{}}") == NULL && errno == EPROTO,
-        "sigcert_json_loads s=valid/wrong fails with EPROTO");
+    ok (sigcert_decode ("", 1) == NULL && errno == EINVAL,
+        "sigcert_decode s=empty fails with EINVAL");
 
-    /* meta gets/sets corner cases
+    /* General meta get/set corner cases
      */
-    const char *s;
     errno = 0;
-    ok (sigcert_meta_sets (NULL, "a", "b") < 0 && errno == EINVAL,
-        "sigcert_meta_sets cert=NULL fails with EINVAL");
+    ok (sigcert_meta_set (NULL, "a", SM_STRING, "b") < 0 && errno == EINVAL,
+        "sigcert_meta_set cert=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_meta_sets (cert, NULL, "b") < 0 && errno == EINVAL,
-        "sigcert_meta_sets key=NULL fails with EINVAL");
+    ok (sigcert_meta_set (cert, NULL, SM_STRING, "b") < 0 && errno == EINVAL,
+        "sigcert_meta_set key=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_meta_sets (cert, "a.b", "b") < 0 && errno == EINVAL,
-        "sigcert_meta_sets key=a.b fails with EINVAL");
+    ok (sigcert_meta_set (cert, "a.b", SM_STRING, "b") < 0 && errno == EINVAL,
+        "sigcert_meta_set key=a.b fails with EINVAL");
     errno = 0;
-    ok (sigcert_meta_sets (cert, "a", NULL) < 0 && errno == EINVAL,
-        "sigcert_meta_sets value=NULL fails with EINVAL");
+    ok (sigcert_meta_get (NULL, "a", SM_STRING, &s) < 0 && errno == EINVAL,
+        "sigcert_meta_get cert=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_meta_gets (NULL, "a", &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets cert=NULL fails with EINVAL");
+    ok (sigcert_meta_get (cert, NULL, SM_STRING, &s) < 0 && errno == EINVAL,
+        "sigcert_meta_get key=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_meta_gets (cert, NULL, &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets key=NULL fails with EINVAL");
+    ok (sigcert_meta_get (cert, ".", SM_STRING, &s) < 0 && errno == EINVAL,
+        "sigcert_meta_get key=. fails with EINVAL");
+
+    /* meta get/set SM_STRING corner cases
+     */
     errno = 0;
-    ok (sigcert_meta_gets (cert, ".", &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets key=. fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_gets (cert, "a", NULL) < 0 && errno == EINVAL,
-        "sigcert_meta_gets value=NULL fails with EINVAL");
+    ok (sigcert_meta_set (cert, "a", SM_STRING, NULL) < 0 && errno == EINVAL,
+        "sigcert_meta_set SM_STRING value=NULL fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-s", SM_STRING, NULL) == 0,
+        "sigcert_meta_get SM_STRING value=NULL works");
     /* wrong type */
     errno = 0;
-    ok (sigcert_meta_gets (cert, "test-i", &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets on int fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-i", SM_STRING, &s) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_STRING on int fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_gets (cert, "test-d", &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets on double fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-d", SM_STRING, &s) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_STRING on double fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_gets (cert, "test-b", &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets on boolean fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-b", SM_STRING, &s) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_STRING on boolean fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_gets (cert, "test-ts", &s) < 0 && errno == EINVAL,
-        "sigcert_meta_gets on timestamp fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-ts", SM_STRING, &s) < 0
+        && errno == ENOENT,
+        "sigcert_meta_get SM_STRING on timestamp fails with ENOENT");
 
-    /* meta geti/seti corner cases
+    /* meta get/set SM_INT64 corner cases
      */
     int64_t i;
-    errno = 0;
-    ok (sigcert_meta_seti (NULL, "a", 42) < 0 && errno == EINVAL,
-        "sigcert_meta_seti cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_seti (cert, NULL, 42) < 0 && errno == EINVAL,
-        "sigcert_meta_seti key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_seti (cert, "a.b", 42) < 0 && errno == EINVAL,
-        "sigcert_meta_seti key=a.b fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_geti (NULL, "a", &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_geti (cert, NULL, &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_geti (cert, ".", &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti key=. fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_geti (cert, "a", NULL) < 0 && errno == EINVAL,
-        "sigcert_meta_geti value=NULL fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-i", SM_INT64, NULL) == 0,
+        "sigcert_meta_get SM_INT64 value=NULL works");
     /* wrong type */
     errno = 0;
-    ok (sigcert_meta_geti (cert, "test-s", &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti on string fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-s", SM_INT64, &i) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_INT64 on string fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_geti (cert, "test-d", &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti on double fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-d", SM_INT64, &i) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_INT64 on double fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_geti (cert, "test-b", &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti on boolean fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-b", SM_INT64, &i) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_INT64 on boolean fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_geti (cert, "test-ts", &i) < 0 && errno == EINVAL,
-        "sigcert_meta_geti on timestamp fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-ts", SM_INT64, &i) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_INT64 on timestamp fails with ENOENT");
 
-    /* meta getd/setd corner cases
+    /* meta get/set SM_DOUBLE corner cases
      */
     double d;
-    errno = 0;
-    ok (sigcert_meta_setd (NULL, "a", 3.14) < 0 && errno == EINVAL,
-        "sigcert_meta_setd cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setd (cert, NULL, 3.14) < 0 && errno == EINVAL,
-        "sigcert_meta_setd key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setd (cert, "a.b", 3.14) < 0 && errno == EINVAL,
-        "sigcert_meta_setd key=a.b fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getd (NULL, "a", &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getd (cert, NULL, &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getd (cert, ".", &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd key=. fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getd (cert, "a", NULL) < 0 && errno == EINVAL,
-        "sigcert_meta_getd value=NULL fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-d", SM_DOUBLE, NULL) == 0,
+        "sigcert_meta_get SM_DOUBLE value=NULL works");
     /* wrong type */
     errno = 0;
-    ok (sigcert_meta_getd (cert, "test-s", &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd on string fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-s", SM_DOUBLE, &d) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_DOUBLE on string fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getd (cert, "test-i", &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd on int fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-i", SM_DOUBLE, &d) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_DOUBLE on int fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getd (cert, "test-b", &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd on boolean fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-b", SM_DOUBLE, &d) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_DOUBLE on boolean fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getd (cert, "test-ts", &d) < 0 && errno == EINVAL,
-        "sigcert_meta_getd on timestamp fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-ts", SM_DOUBLE, &d) < 0
+        && errno == ENOENT,
+        "sigcert_meta_get SM_DOUBLE on timestamp fails with ENOENT");
 
     /* meta getb/setb corner cases
      */
     bool b;
-    errno = 0;
-    ok (sigcert_meta_setb (NULL, "a", false) < 0 && errno == EINVAL,
-        "sigcert_meta_setb cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setb (cert, NULL, false) < 0 && errno == EINVAL,
-        "sigcert_meta_setb key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setb (cert, "a.b", false) < 0 && errno == EINVAL,
-        "sigcert_meta_setb key=a.b fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getb (NULL, "a", &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getb (cert, NULL, &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getb (cert, ".", &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb key=. fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getb (cert, "a", NULL) < 0 && errno == EINVAL,
-        "sigcert_meta_getb value=NULL fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-b", SM_BOOL, NULL) == 0,
+        "sigcert_meta_get SM_BOOL value=NULL works");
     /* wrong type */
     errno = 0;
-    ok (sigcert_meta_getb (cert, "test-s", &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb on string fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-s", SM_BOOL, &b) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_BOOL on string fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getb (cert, "test-i", &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb on int fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-i", SM_BOOL, &b) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_BOOL on int fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getb (cert, "test-d", &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb on double fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-d", SM_BOOL, &b) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_BOOL on double fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getb (cert, "test-ts", &b) < 0 && errno == EINVAL,
-        "sigcert_meta_getb on timestamp fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-ts", SM_BOOL, &b) < 0 && errno == ENOENT,
+        "sigcert_meta_get SM_BOOL on timestamp fails with ENOENT");
 
     /* meta getts/setts corner cases
      */
     time_t t;
-    time_t tnow = time (NULL);
-    const long yrsec = 60*60*24*365;
-    time_t tbyo = tnow + yrsec*1E9;  // a billion years from now?
     errno = 0;
-    ok (sigcert_meta_setts (NULL, "a", tnow) < 0 && errno == EINVAL,
-        "sigcert_meta_setts cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setts (cert, NULL, tnow) < 0 && errno == EINVAL,
-        "sigcert_meta_setts key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setts (cert, "a.b", tnow) < 0 && errno == EINVAL,
-        "sigcert_meta_setts key=a.b fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_setts (cert, "a.b", tbyo) < 0 && errno == EINVAL,
-        "sigcert_meta_setts value=byo fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getts (NULL, "a", &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts cert=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getts (cert, NULL, &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts key=NULL fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getts (cert, ".", &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts key=. fails with EINVAL");
-    errno = 0;
-    ok (sigcert_meta_getts (cert, "a", NULL) < 0 && errno == EINVAL,
-        "sigcert_meta_getts value=NULL fails with EINVAL");
+    ok (sigcert_meta_set (cert, "a", SM_TIMESTAMP, (time_t)-1) < 0
+        && errno == EINVAL,
+        "sigcert_meta_set SM_TIMESTAMP value=-1 fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-ts", SM_TIMESTAMP, NULL) == 0,
+        "sigcert_meta_get SM_TIMESTAMP value=NULL works");
     /* wrong type */
     errno = 0;
-    ok (sigcert_meta_getts (cert, "test-s", &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts on string fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-s", SM_TIMESTAMP, &t) < 0
+        && errno == ENOENT,
+        "sigcert_meta_get SM_TIMESTAMP on string fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getts (cert, "test-i", &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts on int fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-i", SM_TIMESTAMP, &t) < 0
+        && errno == ENOENT,
+        "sigcert_meta_get SM_TIMESTAMP on int fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getts (cert, "test-d", &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts on double fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-d", SM_TIMESTAMP, &t) < 0
+        && errno == ENOENT,
+        "sigcert_meta_get SM_TIMESTAMP on double fails with ENOENT");
     errno = 0;
-    ok (sigcert_meta_getts (cert, "test-b", &t) < 0 && errno == EINVAL,
-        "sigcert_meta_getts on boolean fails with EINVAL");
+    ok (sigcert_meta_get (cert, "test-b", SM_TIMESTAMP, &t) < 0
+        && errno == ENOENT,
+        "sigcert_meta_get SM_TIMESTAMP on boolean fails with ENOENT");
 
     /* Destroy NULL
      */
@@ -648,11 +527,12 @@ void test_sign_cert (void)
     struct sigcert *cert, *cert2;
     struct sigcert *ca;
     const char *name;
-    char *s;
+    const char *s;
+    int len;
 
     if (!(cert = sigcert_create ()))
         BAIL_OUT ("sigcert_create: %s", strerror (errno));
-    if (sigcert_meta_sets (cert, "username", "itsme") < 0)
+    if (sigcert_meta_set (cert, "username", SM_STRING, "itsme") < 0)
         BAIL_OUT ("meta_sets failed");
     if (!(ca = sigcert_create ()))
         BAIL_OUT ("sigcert_create: %s", strerror (errno));
@@ -670,14 +550,13 @@ void test_sign_cert (void)
     ok (sigcert_verify_cert (ca, cert) == 0,
         "sigcert_verify_cert works");
 
-    /* Verification of a signed cert still works after JSON serialization.
+    /* Verification of a signed cert still works after serialization.
      */
-    s = sigcert_json_dumps (cert);
-    ok (s != NULL,
-        "sigcert_json_dumps works on signed cert");
-    cert2 = sigcert_json_loads (s);
+    ok (sigcert_encode (cert, &s, &len) == 0,
+        "sigcert_encode works on signed cert");
+    cert2 = sigcert_decode (s, len);
     ok (cert2 != NULL,
-        "sigcert_json_loads works on signed cert");
+        "sigcert_decode works on signed cert");
     ok (sigcert_verify_cert (ca, cert2) == 0,
         "sigcert_verify_cert works after JSON dumps/loads");
     sigcert_destroy (cert2);
@@ -698,8 +577,8 @@ void test_sign_cert (void)
 
     /* Verification of a signed but modified cert fails.
      */
-    ok (sigcert_meta_sets (cert, "username", "noitsme") == 0,
-        "sigcert_meta_sets changes signed cert");
+    ok (sigcert_meta_set (cert, "username", SM_STRING, "noitsme") == 0,
+        "sigcert_meta_set changes signed cert");
     errno = 0;
     ok (sigcert_verify_cert (ca, cert) < 0 && errno == EINVAL,
         "sigcert_verify_cert fails with EINVAL");
@@ -866,8 +745,7 @@ int main (int argc, char *argv[])
     test_meta ();
     test_load_store ();
     test_sign_verify();
-    test_json_load_dump_sign ();
-    test_json_load_dump ();
+    test_codec ();
     test_corner ();
     test_sign_cert ();
     test_badcert ();

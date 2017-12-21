@@ -33,15 +33,17 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
 #include <limits.h>
+#include <time.h>
 #include <sodium.h>
-#include <jansson.h>
 
-#include "src/libtomlc99/toml.h"
 #include "base64.h"
 #include "tomltk.h"
+#include "kv.h"
+
 #include "sigcert.h"
 
 /* Define some handy types for fixed length keys and their base64 encodings.
@@ -73,10 +75,12 @@ struct sigcert {
     secret_t secret_key;
     sign_t signature;
 
-    json_t *meta;
+    struct kv *meta;
 
     bool secret_valid;
     bool signature_valid;
+
+    struct kv *enc;
 };
 
 void sigcert_destroy (struct sigcert *cert)
@@ -84,7 +88,8 @@ void sigcert_destroy (struct sigcert *cert)
     if (cert) {
         int saved_errno = errno;
         assert (cert->magic == FLUX_SIGCERT_MAGIC);
-        json_decref (cert->meta);
+        kv_destroy (cert->enc);
+        kv_destroy (cert->meta);
         memset (cert->public_key, 0, crypto_sign_PUBLICKEYBYTES);
         memset (cert->secret_key, 0, crypto_sign_SECRETKEYBYTES);
         memset (cert->signature, 0, crypto_sign_BYTES);
@@ -113,7 +118,7 @@ static struct sigcert *sigcert_alloc (void)
     if (!(cert = calloc (1, sizeof (*cert))))
         return NULL;
     cert->magic = FLUX_SIGCERT_MAGIC;
-    if (!(cert->meta = json_object ())) {
+    if (!(cert->meta = kv_create ())) {
         errno = ENOMEM;
         goto error;
     }
@@ -138,214 +143,99 @@ error:
     return NULL;
 }
 
+struct sigcert *sigcert_copy (struct sigcert *cert)
+{
+    struct sigcert *cpy;
+    struct kv *metacpy;
+
+    if (!cert) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (!(metacpy = kv_copy (cert->meta)))
+        return NULL;
+    if (!(cpy = malloc (sizeof (*cpy)))) {
+        kv_destroy (metacpy);
+        return NULL;
+    }
+    memcpy (cpy, cert, sizeof (*cpy));
+    cpy->meta = metacpy;
+    return cpy;
+}
+
+void sigcert_forget_secret (struct sigcert *cert)
+{
+    if (cert && cert->secret_valid) {
+        memset (cert->secret_key, 0, crypto_sign_SECRETKEYBYTES);
+        cert->secret_valid = false;
+    }
+}
+
+static enum kv_type type_tokv (enum sigcert_meta_type type)
+{
+    switch (type) {
+        case SM_STRING:
+            return KV_STRING;
+        case SM_INT64:
+            return KV_INT64;
+        case SM_DOUBLE:
+            return KV_DOUBLE;
+        case SM_BOOL:
+            return KV_BOOL;
+        case SM_TIMESTAMP:
+            return KV_TIMESTAMP;
+        default:
+            return KV_UNKNOWN;
+    }
+}
+
 /* Don't allow '.' in a key or when it's written out to TOML
  * it will look like TOML hierarchy.
  */
-int sigcert_meta_sets (struct sigcert *cert,
-                       const char *key, const char *s)
+static int sigcert_meta_vset (struct sigcert *cert, const char *key,
+                              enum sigcert_meta_type type, va_list ap)
 {
-    json_t *val;
-
-    if (!cert || !key || strchr (key, '.') || !s) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = json_string (s)))
-        goto nomem;
-    if (json_object_set_new (cert->meta, key, val) < 0)
-        goto nomem;
-    return 0;
-nomem:
-    json_decref (val);
-    errno = ENOMEM;
-    return -1;
-}
-
-int sigcert_meta_gets (const struct sigcert *cert,
-                       const char *key, const char **sp)
-{
-    json_t *val;
-    const char *s;
-
-    if (!cert || !key || strchr (key, '.') || !sp) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = json_object_get (cert->meta, key))) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (!(s = json_string_value (val))) {
-        errno = EINVAL;
-        return -1;
-    }
-    *sp = s;
-    return 0;
-}
-
-int sigcert_meta_seti (struct sigcert *cert,
-                       const char *key, int64_t i)
-{
-    json_t *val;
-
     if (!cert || !key || strchr (key, '.')) {
         errno = EINVAL;
         return -1;
     }
-    if (!(val = json_integer ((json_int_t)i)))
-        goto nomem;
-    if (json_object_set_new (cert->meta, key, val) < 0)
-        goto nomem;
-    return 0;
-nomem:
-    json_decref (val);
-    errno = ENOMEM;
-    return -1;
+    return kv_vput (cert->meta, key, type_tokv (type), ap);
 }
 
-int sigcert_meta_geti (const struct sigcert *cert,
-                       const char *key, int64_t *ip)
+int sigcert_meta_set (struct sigcert *cert, const char *key,
+                      enum sigcert_meta_type type, ...)
 {
-    json_t *val;
+    int rc;
+    va_list ap;
 
-    if (!cert || !key || strchr (key, '.') || !ip) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = json_object_get (cert->meta, key))) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (!json_is_integer (val)) {
-        errno = EINVAL;
-        return -1;
-    }
-    *ip = json_integer_value (val);
-    return 0;
+    va_start (ap, type);
+    rc = sigcert_meta_vset (cert, key, type, ap);
+    va_end (ap);
+
+    return rc;
 }
 
-int sigcert_meta_setd (struct sigcert *cert,
-                       const char *key, double d)
+static int sigcert_meta_vget (const struct sigcert *cert, const char *key,
+                              enum sigcert_meta_type type, va_list ap)
 {
-    json_t *val;
-
     if (!cert || !key || strchr (key, '.')) {
         errno = EINVAL;
         return -1;
     }
-    if (!(val = json_real (d)))
-        goto nomem;
-    if (json_object_set_new (cert->meta, key, val) < 0)
-        goto nomem;
-    return 0;
-nomem:
-    json_decref (val);
-    errno = ENOMEM;
-    return -1;
+    return kv_vget (cert->meta, key, type_tokv (type), ap);
 }
 
-int sigcert_meta_getd (const struct sigcert *cert,
-                       const char *key, double *dp)
+int sigcert_meta_get (const struct sigcert *cert, const char *key,
+                      enum sigcert_meta_type type, ...)
 {
-    json_t *val;
+    int rc;
+    va_list ap;
 
-    if (!cert || !key || strchr (key, '.') || !dp) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = json_object_get (cert->meta, key))) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (!json_is_real (val)) {
-        errno = EINVAL;
-        return -1;
-    }
-    *dp = json_real_value (val);
-    return 0;
-}
+    va_start (ap, type);
+    rc = sigcert_meta_vget (cert, key, type, ap);
+    va_end (ap);
 
-int sigcert_meta_setb (struct sigcert *cert,
-                       const char *key, bool b)
-{
-    json_t *val;
-
-    if (!cert || !key || strchr (key, '.')) {
-        errno = EINVAL;
-        return -1;
-    }
-    val = b ? json_true () : json_false ();
-    if (!val)
-        goto nomem;
-    if (json_object_set_new (cert->meta, key, val) < 0)
-        goto nomem;
-    return 0;
-nomem:
-    json_decref (val);
-    errno = ENOMEM;
-    return -1;
-}
-
-int sigcert_meta_getb (const struct sigcert *cert,
-                       const char *key, bool *bp)
-{
-    json_t *val;
-
-    if (!cert || !key || strchr (key, '.') || !bp) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = json_object_get (cert->meta, key))) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (!json_is_true (val) && !json_is_false (val)) {
-        errno = EINVAL;
-        return -1;
-    }
-    *bp = json_is_true (val) ? true : false;
-    return 0;
-}
-
-/* Timestamp is the only TOML type that doesn't have a corresponding
- * JSON type.  Represent it as a JSON object that looks like this:
- *   { "iso-8601-ts" : "2003-08-24T05:14:50Z" }
- * Since this is the only metadata represented as an object, and
- * metadata is strictly a flat list, this cannot be confused with any
- * of the other metadata types.
- */
-int sigcert_meta_setts (struct sigcert *cert,
-                        const char *key, time_t t)
-{
-    json_t *val;
-
-    if (!cert || !key || strchr (key, '.')) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = tomltk_epoch_to_json (t)))
-        return -1;
-    if (json_object_set_new (cert->meta, key, val) < 0) {
-        json_decref (val);
-        errno = ENOMEM;
-    }
-    return 0;
-}
-
-int sigcert_meta_getts (const struct sigcert *cert,
-                        const char *key, time_t *tp)
-{
-    json_t *val;
-
-    if (!cert || !key || strchr (key, '.') || !tp) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (!(val = json_object_get (cert->meta, key))) {
-        errno = ENOENT;
-        return -1;
-    }
-    return tomltk_json_to_epoch (val, tp);
+    return rc;
 }
 
 /* encode public key 'src' to base64 'dst'
@@ -481,55 +371,38 @@ static int sigcert_fwrite_secret (const struct sigcert *cert, FILE *fp)
  */
 static int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
 {
-    void *iter;
+    const char *key = NULL;
 
     // [metadata]
     if (fprintf (fp, "[metadata]\n") < 0)
         goto error;
-    iter = json_object_iter (cert->meta);
-    while (iter) {
-        const char *mkey = json_object_iter_key (iter);
-        json_t *val = json_object_iter_value (iter);
-
-        if (!mkey || !val) {
-            errno = EINVAL;
-            goto error;
-        }
-        if (json_is_string (val)) {
-            if (fprintf (fp, "    %s = \"%s\"\n",
-                         mkey, json_string_value (val)) < 0)
+    while ((key = kv_next (cert->meta, key))) {
+        switch (kv_typeof (key)) {
+            case KV_STRING:
+                if (fprintf (fp, "    %s = \"%s\"\n",
+                             key, kv_val_string (key)) < 0)
+                    goto error;
+                break;
+            case KV_INT64:
+                if (fprintf (fp, "    %s = %" PRIi64 "\n",
+                             key, kv_val_int64 (key)) < 0)
+                    goto error;
+                break;
+            case KV_DOUBLE:
+                if (fprintf (fp, "    %s = %f\n",
+                             key, kv_val_double (key)) < 0)
+                    goto error;
+                break;
+            case KV_BOOL:       // kv_val_string is "true" or "false"
+            case KV_TIMESTAMP:  // kv_val_string is ISO 8601 time string
+                if (fprintf (fp, "    %s = %s\n",
+                             key, kv_val_string (key)) < 0)
+                    goto error;
+                break;
+            default:
+                errno = EINVAL;
                 goto error;
         }
-        else if (json_is_true (val)) {
-            if (fprintf (fp, "    %s = true\n", mkey) < 0)
-                goto error;
-        }
-        else if (json_is_false (val)) {
-            if (fprintf (fp, "    %s = false\n", mkey) < 0)
-                goto error;
-        }
-        else if (json_is_integer (val)) {
-            if (fprintf (fp, "    %s = %lld\n",
-                         mkey, (long long)json_integer_value (val)) < 0)
-                goto error;
-        }
-        else if (json_is_real (val)) {
-            if (fprintf (fp, "    %s = %f\n",
-                         mkey, json_real_value (val)) < 0)
-                goto error;
-        }
-        else if (json_is_object (val)) {
-            const char *s;
-            if (json_unpack (val, "{s:s}", "iso-8601-ts", &s) < 0)
-                goto error;
-            if (fprintf (fp, "    %s = %s\n", mkey, s) < 0)
-                goto error;
-        }
-        else {
-            errno = EINVAL;
-            goto error;
-        }
-        iter = json_object_iter_next (cert->meta, iter);
     }
     if (fprintf (fp, "\n") < 0)
         goto error;
@@ -645,26 +518,26 @@ static int parse_toml_meta_set (const char *raw, struct sigcert *cert,
     toml_timestamp_t ts;
 
     if (toml_rtos (raw, &s) == 0) {
-        if (sigcert_meta_sets (cert, key, s) < 0)
+        if (sigcert_meta_set (cert, key, SM_STRING, s) < 0)
             goto done;
     }
     else if (toml_rtob (raw, &b) == 0) {
-        if (sigcert_meta_setb (cert, key, b) < 0)
+        if (sigcert_meta_set (cert, key, SM_BOOL, b) < 0)
             goto done;
     }
     else if (toml_rtoi (raw, &i) == 0) {
-        if (sigcert_meta_seti (cert, key, i) < 0)
+        if (sigcert_meta_set (cert, key, SM_INT64, i) < 0)
             goto done;
     }
     else if (toml_rtod (raw, &d) == 0) {
-        if (sigcert_meta_setd (cert, key, d) < 0)
+        if (sigcert_meta_set (cert, key, SM_DOUBLE, d) < 0)
             goto done;
     }
     else if (toml_rtots (raw, &ts) == 0) {
         time_t t;
         if (tomltk_ts_to_epoch (&ts, &t) < 0)
             goto done;
-        if (sigcert_meta_setts (cert, key, t) < 0)
+        if (sigcert_meta_set (cert, key, SM_TIMESTAMP, t) < 0)
             goto done;
     }
     else
@@ -787,130 +660,88 @@ error:
     return NULL;
 }
 
-/* Encode 'sign' as base64 and add signature = sign_base64 to 'obj'.
- */
-static int sigcert_pack_signature (const sign_t sign, json_t *obj)
+static int get_pubkey (struct kv *kv, uint8_t *pub)
 {
-    sign_base64_t sign_base64;
-    json_t *sigobj;
-
-    if (!obj) {
-        errno = EINVAL;
+    const char *pub_s;
+    if (kv_get (kv, "curve.public-key", KV_STRING, &pub_s) < 0)
         return -1;
-    }
-    sigcert_base64_encode_sign (sign, sign_base64);
-    sigobj = json_string (sign_base64);
-    if (!sigobj || json_object_set_new (obj, "signature", sigobj) < 0) {
-        json_decref (sigobj);
-        errno = ENOMEM;
-        return -1;
-    }
-    return 0;
+    return sigcert_base64_decode_public (pub_s, pub);
 }
 
-/* This is used to serialize the cert for signing.
- * The secret key is always exluded.
- * The signature is included if signature=true and it's valid.
- * IMPORTANT:  This serialization is used for generating a signature over
- * the cert itself.  It's not exposed outside of this module for that purpose,
- * but changing it could make certs that were signed before the change fail
- * verification!
- */
-static char *sigcert_json_dumps_flags (const struct sigcert *cert,
-                                       bool signature)
+static int get_signature (struct kv *kv, uint8_t *sign)
 {
-    json_t *obj = NULL;
-    public_base64_t pubkey;
-    int saved_errno;
-    char *s;
+    const char *sign_s;
 
-    if (!cert) {
+    if (kv_get (kv, "curve.signature", KV_STRING, &sign_s) < 0)
+        return -1;
+    return sigcert_base64_decode_sign (sign_s, sign);
+}
+
+struct sigcert *sigcert_decode (const char *s, int len)
+{
+    struct kv *kv;
+    struct sigcert *cert;
+
+    if (!s || len == 0) {
         errno = EINVAL;
         return NULL;
     }
-    sigcert_base64_encode_public (cert->public_key, pubkey);
-    if (!(obj = json_pack ("{s:O,s:{s:s}}",
-                           "metadata", cert->meta,
-                           "curve",
-                             "public-key", pubkey))) {
-        errno = ENOMEM;
-        goto error;
-    }
-    if (signature && cert->signature_valid) {
-        if (sigcert_pack_signature (cert->signature,
-                                    json_object_get (obj, "curve")) < 0)
-            goto error;
-    }
-    if (!(s = json_dumps (obj, JSON_COMPACT|JSON_SORT_KEYS))) {
-        errno = ENOMEM;
-        goto error;
-    }
-    json_decref (obj);
-    return s;
-error:
-    saved_errno = errno;
-    json_decref (obj);
-    errno = saved_errno;
-    return NULL;
-}
-
-char *sigcert_json_dumps (const struct sigcert *cert)
-{
-    return sigcert_json_dumps_flags (cert, true);
-}
-
-struct sigcert *sigcert_json_loads (const char *s)
-{
-    json_t *obj = NULL;
-    json_t *curve, *sig;
-    struct sigcert *cert = NULL;
-    const char *pub;
-    int saved_errno;
-
-    if (!s) {
-        errno = EINVAL;
+    if (!(kv = kv_decode (s, len)))
         return NULL;
-    }
     if (!(cert = sigcert_alloc ()))
-        return NULL;
-    json_decref (cert->meta); // we create cert->meta from scratch below
-    cert->meta = NULL;
+        goto error;
 
-    if (!(obj = json_loads (s, 0, NULL))) {
-        errno = EPROTO;
+    kv_destroy (cert->meta);
+    if (!(cert->meta = kv_split (kv, "meta.")))
         goto error;
-    }
-    if (json_unpack (obj, "{s:O,s:{s:s}}",
-                     "metadata", &cert->meta,
-                     "curve",
-                       "public-key", &pub) < 0) {
-        errno = EPROTO;
+    if (get_pubkey (kv, cert->public_key) < 0)
         goto error;
-    }
-    if (sigcert_base64_decode_public (pub, cert->public_key) < 0) {
-        errno = EPROTO;
-        goto error;
-    }
-    if (!(curve = json_object_get (obj, "curve"))) {
-        errno = EINVAL;
-        goto error;
-    }
-    if ((sig = json_object_get (curve, "signature"))) {
-        if (sigcert_base64_decode_sign (json_string_value (sig),
-                                        cert->signature) < 0) {
-            errno = EPROTO;
-            goto error;
-        }
+    if (get_signature (kv, cert->signature) == 0)
         cert->signature_valid = true;
-    }
-    json_decref (obj);
+    else if (errno != ENOENT)
+        goto error;
+    kv_destroy (kv);
     return cert;
 error:
-    saved_errno = errno;
-    json_decref (obj);
+    kv_destroy (kv);
     sigcert_destroy (cert);
-    errno = saved_errno;
     return NULL;
+}
+
+static int put_pubkey (struct kv *kv, const uint8_t *pub)
+{
+    public_base64_t pub_s;
+
+    sigcert_base64_encode_public (pub, pub_s);
+    return kv_put (kv, "curve.public-key", KV_STRING, pub_s);
+}
+
+static int put_signature (struct kv *kv, const uint8_t *sign)
+{
+    sign_base64_t sign_s;
+
+    sigcert_base64_encode_sign (sign, sign_s);
+    return kv_put (kv, "curve.signature", KV_STRING, sign_s);
+}
+
+int sigcert_encode (const struct sigcert *cert, const char **buf, int *len)
+{
+    if (!cert || !buf || !len) {
+        errno = EINVAL;
+        return -1;
+    }
+    kv_destroy (cert->enc);
+    if (!(((struct sigcert *)(cert))->enc = kv_create()))
+        return -1;
+    if (kv_join (cert->enc, cert->meta, "meta.") < 0)
+        return -1;
+    if (put_pubkey (cert->enc, cert->public_key) < 0)
+        return -1;
+    if (cert->signature_valid) {
+        if (put_signature (cert->enc, cert->signature) < 0)
+            return -1;
+    }
+    return kv_encode (cert->enc, buf, len);
 }
 
 bool sigcert_equal (const struct sigcert *cert1,
@@ -918,7 +749,7 @@ bool sigcert_equal (const struct sigcert *cert1,
 {
     if (!cert1 || !cert2)
         return false;
-    if (!json_equal (cert1->meta, cert2->meta))
+    if (!kv_equal (cert1->meta, cert2->meta))
         return false;
     if (memcmp (cert1->public_key, cert2->public_key,
                                    crypto_sign_PUBLICKEYBYTES) != 0)
@@ -976,48 +807,66 @@ int sigcert_verify (const struct sigcert *cert,
 int sigcert_sign_cert (const struct sigcert *cert1,
                        struct sigcert *cert2)
 {
-    char *s;
-    int rc;
+    struct kv *kv;
+    const char *kv_s;
+    int kv_len;
+    int rc = -1;
 
     if (!cert1 || !cert2 || !cert1->secret_valid) {
         errno = EINVAL;
         return -1;
     }
-    if (!(s = sigcert_json_dumps_flags (cert2, false)))
+    if (!(kv = kv_create()))
         return -1;
-    rc = crypto_sign_detached (cert2->signature, NULL,
-                               (uint8_t *)s, strlen (s),
-                               cert1->secret_key);
-    free (s);
-    if (rc < 0) {
+    if (put_pubkey (kv, cert2->public_key) < 0)
+        goto done;
+    if (kv_join (kv, cert2->meta, "meta.") < 0)
+        goto done;
+    if (kv_encode (kv, &kv_s, &kv_len) < 0)
+        goto done;
+    if (crypto_sign_detached (cert2->signature, NULL,
+                              (uint8_t *)kv_s, kv_len,
+                              cert1->secret_key) < 0) {
         errno = EINVAL;
-        return -1;
+        goto done;
     }
     cert2->signature_valid = true;
-    return 0;
+    rc = 0;
+done:
+    kv_destroy (kv);
+    return rc;
 }
 
 int sigcert_verify_cert (const struct sigcert *cert1,
                          const struct sigcert *cert2)
 {
-    char *s;
-    int rc;
+    struct kv *kv;
+    const char *kv_s;
+    int kv_len;
+    int rc = -1;
 
     if (!cert1 || !cert2 || !cert2->signature_valid) {
         errno = EINVAL;
         return -1;
     }
-    if (!(s = sigcert_json_dumps_flags (cert2, false)))
+    if (!(kv = kv_create()))
         return -1;
-    rc = crypto_sign_verify_detached (cert2->signature,
-                                      (uint8_t *)s, strlen (s),
-                                      cert1->public_key);
-    free (s);
-    if (rc < 0) {
+    if (put_pubkey (kv, cert2->public_key) < 0)
+        goto done;
+    if (kv_join (kv, cert2->meta, "meta.") < 0)
+        goto done;
+    if (kv_encode (kv, &kv_s, &kv_len) < 0)
+        goto done;
+    if (crypto_sign_verify_detached (cert2->signature,
+                                     (uint8_t *)kv_s, kv_len,
+                                     cert1->public_key) < 0) {
         errno = EINVAL;
-        return -1;
+        goto done;
     }
-    return 0;
+    rc = 0;
+done:
+    kv_destroy (kv);
+    return rc;
 }
 
 /*
