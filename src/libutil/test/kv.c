@@ -52,33 +52,33 @@ static void simple_test (void)
     kv = kv_create ();
     ok (kv != NULL,
         "kv_create works");
-    ok (kv_put_string (kv, "a", "foo") == 0,
+    ok (kv_put (kv, "a", KV_STRING, "foo") == 0,
         "kv_put a=foo works");
-    ok (kv_get_string (kv, "a", &s) == 0 && !strcmp (s, "foo"),
-        "kv_get_string a retrieves correct value: %s", s);
-    ok (kv_put_int64 (kv, "b", 42) == 0,
-        "kv_put_int64 b=42 works");
-    ok (kv_put_double (kv, "c", 3.14) == 0,
-        "kv_put_double c=3.14 works");
-    ok (kv_put_bool (kv, "d", true) == 0,
-        "kv_put_bool d=true works");
-    ok (kv_put_timestamp (kv, "e", now) == 0,
-        "kv_put_timestamp e=(now) works");
+    ok (kv_get (kv, "a", KV_STRING, &s) == 0 && !strcmp (s, "foo"),
+        "kv_get a retrieves correct value");
+    ok (kv_put (kv, "b", KV_INT64, 42LL) == 0,
+        "kv_put b=42 works");
+    ok (kv_put (kv, "c", KV_DOUBLE, 3.14) == 0,
+        "kv_put c=3.14 works");
+    ok (kv_put (kv, "d", KV_BOOL, true) == 0,
+        "kv_put d=true works");
+    ok (kv_put (kv, "e", KV_TIMESTAMP, now) == 0,
+        "kv_put e=(now) works");
     diag_kv (kv);
 
-    ok (kv_get_string (kv, "a", &s) == 0 && !strcmp (s, "foo"),
-        "kv_get_string a retrieves correct value");
-    ok (kv_get_int64 (kv, "b", &i) == 0 && i == 42,
-        "kv_get_int64 b retrieves correct value");
-    ok (kv_get_double (kv, "c", &d) == 0 && d == 3.14,
-        "kv_get_double c retrieves correct value");
-    ok (kv_get_bool (kv, "d", &b) == 0 && b == true,
-        "kv_get_bool d retrieves correct value");
-    ok (kv_get_timestamp (kv, "e", &t) == 0 && t == now,
-        "kv_get_timestamp e retrieves correct value");
+    ok (kv_get (kv, "a", KV_STRING, &s) == 0 && !strcmp (s, "foo"),
+        "kv_get a retrieves correct value");
+    ok (kv_get (kv, "b", KV_INT64, &i) == 0 && i == 42,
+        "kv_get b retrieves correct value");
+    ok (kv_get (kv, "c", KV_DOUBLE, &d) == 0 && d == 3.14,
+        "kv_get c retrieves correct value");
+    ok (kv_get (kv, "d", KV_BOOL, &b) == 0 && b == true,
+        "kv_get d retrieves correct value");
+    ok (kv_get (kv, "e", KV_TIMESTAMP, &t) == 0 && t == now,
+        "kv_get e retrieves correct value");
     errno = 0;
-    ok (kv_get_string (kv, "f", &s) < 0 && errno == ENOENT,
-        "kv_get_string f fails with ENOENT");
+    ok (kv_get (kv, "f", KV_STRING, &s) < 0 && errno == ENOENT,
+        "kv_get f fails with ENOENT");
 
     /* Iterate over entries.
      */
@@ -192,20 +192,20 @@ static void check_expansion (void)
     for (i = 0; i < 100; i++) {
         snprintf (keybuf, sizeof (keybuf), "key%032d", i);
         snprintf (valbuf, sizeof (valbuf), "%032d", i);
-        if (kv_put_string (kv, keybuf, valbuf) < 0)
+        if (kv_put (kv, keybuf, KV_STRING, valbuf) < 0)
             break;
     }
     ok (i == 100,
-        "kv_put_string added 100 69-byte entries");
+        "kv_put added 100 69-byte entries");
 
     for (i = 0; i < 100; i++) {
         snprintf (keybuf, sizeof (keybuf), "key%032d", i);
         snprintf (valbuf, sizeof (valbuf), "%032d", i);
-        if (kv_get_string (kv, keybuf, &s) < 0 || strcmp (s, valbuf) != 0)
+        if (kv_get (kv, keybuf, KV_STRING, &s) < 0 || strcmp (s, valbuf) != 0)
             break;
     }
     ok (i == 100,
-        "kv_get_string verified 100 69-byte entries");
+        "kv_get verified 100 69-byte entries");
 
     kv_destroy (kv);
 }
@@ -224,8 +224,8 @@ static void bad_parameters (void)
         BAIL_OUT ("kv_create failed");
     if (!(kv2 = kv_create ()))
         BAIL_OUT ("kv_create failed");
-    if (kv_put_string (kv2, "foo", "bar") < 0)
-        BAIL_OUT ("kv_put_string failed");
+    if (kv_put (kv2, "foo", KV_STRING, "bar") < 0)
+        BAIL_OUT ("kv_put failed");
     if (!(entry = kv_next (kv2, NULL)))
         BAIL_OUT ("kv_next kv=(one entry) key=NULL returned NULL");
 
@@ -244,37 +244,35 @@ static void bad_parameters (void)
     ok (kv_equal (NULL, NULL) == false,
         "kv_equal kv1=NULL kv2=NULL returns false");
 
-    /* kv_put_*
-     * bad params caught with type independent common code
+    /* kv_put
      */
     errno = 0;
-    ok (kv_put_string (NULL, "foo", "bar") < 0 && errno == EINVAL,
-        "kv_put_string kv=NULL fails with EINVAL");
+    ok (kv_put (NULL, "foo", KV_STRING, "bar") < 0 && errno == EINVAL,
+        "kv_put kv=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_put_string (kv, NULL, "bar") < 0 && errno == EINVAL,
-        "kv_put_string key=NULL fails with EINVAL");
+    ok (kv_put (kv, NULL, KV_STRING, "bar") < 0 && errno == EINVAL,
+        "kv_put key=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_put_string (kv, "", NULL) < 0 && errno == EINVAL,
-        "kv_put_string key="" fails with EINVAL");
+    ok (kv_put (kv, "", KV_STRING, NULL) < 0 && errno == EINVAL,
+        "kv_put key="" fails with EINVAL");
     errno = 0;
-    ok (kv_put_string (kv, "foo", NULL) < 0 && errno == EINVAL,
+    ok (kv_put (kv, "foo", KV_STRING, NULL) < 0 && errno == EINVAL,
         "kv_put_string val=NULL fails with EINVAL");
 
     errno = 0;
-    ok (kv_put_timestamp (kv, "foo", -1) < 0 && errno == EINVAL,
+    ok (kv_put (kv, "foo", KV_TIMESTAMP, (time_t)-1) < 0 && errno == EINVAL,
         "kv_put_timestamp val=-1 fails with EINVAL");
 
-    /* kv_get_*
-     * bad params caught with type independent common code
+    /* kv_get
      */
     errno = 0;
-    ok (kv_get_string (NULL, "foo", &s) < 0 && errno == EINVAL,
-        "kv_get_string kv=NULL fails with EINVAL");
+    ok (kv_get (NULL, "foo", KV_STRING, &s) < 0 && errno == EINVAL,
+        "kv_get kv=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_get_string (kv, NULL, &s) < 0 && errno == EINVAL,
-        "kv_get_string key=NULL fails with EINVAL");
+    ok (kv_get (kv, NULL, KV_STRING, &s) < 0 && errno == EINVAL,
+        "kv_get key=NULL fails with EINVAL");
     errno = 0;
-    ok (kv_get_string (kv, "", &s) < 0 && errno == EINVAL,
+    ok (kv_get (kv, "", KV_STRING, &s) < 0 && errno == EINVAL,
         "kv_get_string key="" fails with EINVAL");
 
     /* iteration
@@ -342,15 +340,15 @@ void key_deletion (void)
 
     if (!(kv = kv_create ()))
         BAIL_OUT ("kv_create failed");
-    ok (kv_put_string (kv, "foo", "bar") == 0,
-        "kv_put_string foo=bar works");
+    ok (kv_put (kv, "foo", KV_STRING, "bar") == 0,
+        "kv_put foo=bar works");
     ok (kv_delete (kv, "foo") == 0,
         "kv_delete foo works");
     errno = 0;
     ok (kv_delete (kv, "foo") < 0,
         "kv_delete foo a second time fails with ENOENT");
-    ok (kv_put_string (kv, "foo", "baz") == 0,
-        "kv_put_string foo=baz works");
+    ok (kv_put (kv, "foo", KV_STRING, "baz") == 0,
+        "kv_put foo=baz works");
 
     kv_destroy (kv);
 }
@@ -363,42 +361,42 @@ void key_update (void)
     if (!(kv = kv_create ()))
         BAIL_OUT ("kv_create failed");
 
-    ok (kv_put_string (kv, "foo", "bar") == 0,
-        "kv_put_string foo=bar works");
+    ok (kv_put (kv, "foo", KV_STRING, "bar") == 0,
+        "kv_put foo=bar works");
 
     /* Update first (only) entry
      */
-    ok (kv_put_string (kv, "foo", "baz") == 0,
-        "kv_put_string foo=baz works");
-    ok (kv_get_string (kv, "foo", &val) == 0 && !strcmp (val, "baz"),
-        "kv_get_string foo returns baz");
+    ok (kv_put (kv, "foo", KV_STRING, "baz") == 0,
+        "kv_put foo=baz works");
+    ok (kv_get (kv, "foo", KV_STRING, &val) == 0 && !strcmp (val, "baz"),
+        "kv_get foo returns baz");
 
-    ok (kv_put_string (kv, "bar", "xxx") == 0,
-        "kv_put_string bar=xxx works");
+    ok (kv_put (kv, "bar", KV_STRING, "xxx") == 0,
+        "kv_put bar=xxx works");
 
     /* Update first (of two) entry
      */
-    ok (kv_put_string (kv, "foo", "yyy") == 0,
-        "kv_put_string foo=yyy works");
-    ok (kv_get_string (kv, "foo", &val) == 0 && !strcmp (val, "yyy"),
-        "kv_get_string foo returns yyy");
+    ok (kv_put (kv, "foo", KV_STRING, "yyy") == 0,
+        "kv_put foo=yyy works");
+    ok (kv_get (kv, "foo", KV_STRING, &val) == 0 && !strcmp (val, "yyy"),
+        "kv_get foo returns yyy");
 
     /* Update second (of two) entry
      */
-    ok (kv_put_string (kv, "bar", "zzz") == 0,
-        "kv_put_string bar=zzz works");
-    ok (kv_get_string (kv, "bar", &val) == 0 && !strcmp (val, "zzz"),
-        "kv_get_string bar returns zzz");
+    ok (kv_put (kv, "bar", KV_STRING, "zzz") == 0,
+        "kv_put bar=zzz works");
+    ok (kv_get (kv, "bar", KV_STRING, &val) == 0 && !strcmp (val, "zzz"),
+        "kv_get bar returns zzz");
 
-    ok (kv_put_string (kv, "baz", "qqq") == 0,
-        "kv_put_string baz=qqq works");
+    ok (kv_put (kv, "baz", KV_STRING, "qqq") == 0,
+        "kv_put baz=qqq works");
 
     /* Update second (of three) entry
      */
-    ok (kv_put_string (kv, "bar", "111") == 0,
+    ok (kv_put (kv, "bar", KV_STRING, "111") == 0,
         "kv_put_string bar=111 works");
-    ok (kv_get_string (kv, "bar", &val) == 0 && !strcmp (val, "111"),
-        "kv_get_string bar returns 111");
+    ok (kv_get (kv, "bar", KV_STRING, &val) == 0 && !strcmp (val, "111"),
+        "kv_get bar returns 111");
 
     kv_destroy (kv);
 }
@@ -408,10 +406,10 @@ static struct kv *create_test_kv (void)
     struct kv *kv;
     if (!(kv = kv_create ()))
         BAIL_OUT ("kv_create failed");
-    if (kv_put_string (kv, "a", "foo") < 0
-        || kv_put_int64 (kv, "b", 42) < 0
-        || kv_put_double (kv, "c", 3.14) < 0
-        || kv_put_bool (kv, "d", true) < 0)
+    if (kv_put (kv, "a", KV_STRING, "foo") < 0
+        || kv_put (kv, "b", KV_INT64, 42LL) < 0
+        || kv_put (kv, "c", KV_DOUBLE, 3.14) < 0
+        || kv_put (kv, "d", KV_BOOL, true) < 0)
         BAIL_OUT ("kv_put failed");
     return kv;
 }

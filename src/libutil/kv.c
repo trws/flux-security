@@ -33,6 +33,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <time.h>
+#include <stdarg.h>
 #include <assert.h>
 
 #include "kv.h"
@@ -187,12 +188,11 @@ int kv_delete (struct kv *kv, const char *key)
     return 0;
 }
 
-/* Put typed key=val (val is in string form).
- * If key already exists, remove it first.
- * Return 0 on success, -1 on failure with errno set.
+/* Put 'val' of a given type that has been already been converted to a string.
+ * Returns 0 on success, -1 on failure with errno set.
  */
-static int kv_put (struct kv *kv, const char *key,
-                   enum kv_type type, const char *val)
+static int kv_put_raw (struct kv *kv, const char *key, enum kv_type type,
+                       const char *val)
 {
     if (!kv || !valid_key (key) || !val) {
         errno = EINVAL;
@@ -214,47 +214,62 @@ static int kv_put (struct kv *kv, const char *key,
     return 0;
 }
 
-int kv_put_string (struct kv *kv, const char *key, const char *val)
+int kv_vput (struct kv *kv, const char *key, enum kv_type type, va_list ap)
 {
-    return kv_put (kv, key, KV_STRING, val);
-}
+    char s[80];
+    const char *val = NULL;
 
-int kv_put_int64 (struct kv *kv, const char *key, int64_t val)
-{
-    char s[64];
-    if (snprintf (s, sizeof (s), "%" PRIi64, val) >= sizeof (s)) {
-        errno = EINVAL;
-        return -1;
+    if (!kv || !valid_key (key))
+        goto inval;
+    switch (type) {
+        case KV_STRING:
+            val = va_arg (ap, const char *);
+            break;
+        case KV_INT64:
+            if (vsnprintf (s, sizeof (s), "%" PRIi64, ap) >= sizeof (s))
+                goto inval;
+            val = s;
+            break;
+        case KV_DOUBLE:
+            if (vsnprintf (s, sizeof (s), "%f", ap) >= sizeof (s))
+                goto inval;
+            val = s;
+            break;
+        case KV_BOOL: {
+            bool b = va_arg (ap, int); // va promotes bool to int
+            val = b ? "true" : "false";
+            break;
+        }
+        case KV_TIMESTAMP: {
+            struct tm tm;
+            time_t t = va_arg (ap, time_t);
+            if (t < 0 || !gmtime_r (&t, &tm))
+                goto inval;
+             if (strftime (s, sizeof (s), "%FT%TZ", &tm) == 0)
+                goto inval;
+            val = s;
+            break;
+        }
+        default:
+            goto inval;
     }
-    return kv_put (kv, key, KV_INT64, s);
+    if (!val)
+        goto inval;
+    return kv_put_raw (kv, key, type, val);
+inval:
+    errno = EINVAL;
+    return -1;
 }
 
-int kv_put_double (struct kv *kv, const char *key, double val)
+int kv_put (struct kv *kv, const char *key, enum kv_type type, ...)
 {
-    char s[64];
-    if (snprintf (s, sizeof (s), "%f", val) >= sizeof (s)) {
-        errno = EINVAL;
-        return -1;
-    }
-    return kv_put (kv, key, KV_DOUBLE, s);
-}
+    va_list ap;
+    int rc;
 
-int kv_put_bool (struct kv *kv, const char *key, bool val)
-{
-    return kv_put (kv, key, KV_BOOL, val ? "true" : "false");
-}
-
-int kv_put_timestamp (struct kv *kv, const char *key, time_t val)
-{
-    char s[64];
-    struct tm tm;
-
-    if (val < 0 || !gmtime_r (&val, &tm)
-                || strftime (s, sizeof (s), "%FT%TZ", &tm) == 0) {
-        errno = EINVAL;
-        return -1;
-    }
-    return kv_put (kv, key, KV_TIMESTAMP, s);
+    va_start (ap, type);
+    rc = kv_vput (kv, key, type, ap);
+    va_end (ap);
+    return rc;
 }
 
 const char *kv_next (const struct kv *kv, const char *key)
@@ -328,54 +343,59 @@ enum kv_type kv_typeof (const char *key)
     }
 }
 
-int kv_get_string (const struct kv *kv, const char *key, const char **val)
+int kv_vget (const struct kv *kv, const char *key,
+             enum kv_type type, va_list ap)
 {
-    const char *entry = kv_find (kv, key, KV_STRING);
+    const char *entry = kv_find (kv, key, type);
     if (!entry)
         return -1;
-    if (val)
-        *val = kv_val_string (entry);
+    switch (type) {
+        case KV_STRING: {
+            const char **val = va_arg (ap, const char **);
+            if (val)
+                *val = kv_val_string (entry);
+            break;
+        }
+        case KV_INT64: {
+            int64_t *val = va_arg (ap, int64_t *);
+            if (val)
+                *val = kv_val_int64 (entry);
+            break;
+        }
+        case KV_DOUBLE: {
+            double *val = va_arg (ap, double *);
+            if (val)
+                *val = kv_val_double (entry);
+            break;
+        }
+        case KV_BOOL: {
+            bool *val = va_arg (ap, bool *);
+            if (val)
+                *val = kv_val_bool (entry);
+            break;
+        }
+        case KV_TIMESTAMP: {
+            time_t *val = va_arg (ap, time_t *);
+            if (val)
+                *val = kv_val_timestamp (entry);
+            break;
+        }
+        default:
+            errno = EINVAL;
+            return -1;
+    }
     return 0;
 }
 
-int kv_get_int64 (const struct kv *kv, const char *key, int64_t *val)
+int kv_get (const struct kv *kv, const char *key, enum kv_type type, ...)
 {
-    const char *entry = kv_find (kv, key, KV_INT64);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_int64 (entry);
-    return 0;
-}
+    va_list ap;
+    int rc;
 
-int kv_get_double (const struct kv *kv, const char *key, double *val)
-{
-    const char *entry = kv_find (kv, key, KV_DOUBLE);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_double (entry);
-    return 0;
-}
-
-int kv_get_bool (const struct kv *kv, const char *key, bool *val)
-{
-    const char *entry = kv_find (kv, key, KV_BOOL);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_bool (entry);
-    return 0;
-}
-
-int kv_get_timestamp (const struct kv *kv, const char *key, time_t *val)
-{
-    const char *entry = kv_find (kv, key, KV_TIMESTAMP);
-    if (!entry)
-        return -1;
-    if (val)
-        *val = kv_val_timestamp (entry);
-    return 0;
+    va_start (ap, type);
+    rc = kv_vget (kv, key, type, ap);
+    va_end (ap);
+    return rc;
 }
 
 /* Validate a just-decoded kv buffer.
@@ -441,7 +461,7 @@ struct kv *kv_raw_decode (const char *buf, int len)
     return kv;
 }
 
-/* Wrapper for kv_put() which adds 'prefix' to key, if non-NULL.
+/* Wrapper for kv_put_raw() which adds 'prefix' to key, if non-NULL.
  * Returns 0 on success, -1 on failure with errno set (ENOMEM).
  */
 static int kv_put_prefix (struct kv *kv, const char *prefix, const char *key,
@@ -454,7 +474,7 @@ static int kv_put_prefix (struct kv *kv, const char *prefix, const char *key,
             return -1;
         key = newkey;
     }
-    if (kv_put (kv, key, type, val) < 0) {
+    if (kv_put_raw (kv, key, type, val) < 0) {
         int saved_errno = errno;
         free (newkey);
         errno = saved_errno;
@@ -486,8 +506,8 @@ struct kv *kv_split (const struct kv *kv1, const char *prefix)
         return NULL;
     while ((key = kv_next (kv1, key))) {
         if (strlen (key) > n && !strncmp (key, prefix, n)) {
-            if (kv_put (kv2, key + n, kv_typeof (key),
-                                      kv_val_string (key)) < 0) {
+            if (kv_put_raw (kv2, key + n, kv_typeof (key),
+                                          kv_val_string (key)) < 0) {
                 kv_destroy (kv2);
                 return NULL;
             }
