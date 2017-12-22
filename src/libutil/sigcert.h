@@ -60,14 +60,14 @@ bool sigcert_equal (const struct sigcert *cert1,
 /* Return a detached signature (base64 string) over buf, len.
  * Caller must free.
  */
-char *sigcert_sign (const struct sigcert *cert,
-                    uint8_t *buf, int len);
+char *sigcert_sign_detached (const struct sigcert *cert,
+                             uint8_t *buf, int len);
 
 /* Verify a detached signature (base64 string) over buf, len.
  * Returns 0 on success, -1 on failure.
  */
-int sigcert_verify (const struct sigcert *cert,
-                    const char *signature, uint8_t *buf, int len);
+int sigcert_verify_detached (const struct sigcert *cert,
+                             const char *signature, uint8_t *buf, int len);
 
 /* Use cert1 to sign cert2.
  * The signature covers public key and all metadata.

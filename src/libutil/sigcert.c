@@ -764,8 +764,8 @@ bool sigcert_equal (const struct sigcert *cert1,
     return true;
 }
 
-char *sigcert_sign (const struct sigcert *cert,
-                    uint8_t *buf, int len)
+char *sigcert_sign_detached (const struct sigcert *cert,
+                             uint8_t *buf, int len)
 {
     sign_t sig;
     sign_base64_t sig_base64;
@@ -782,8 +782,8 @@ char *sigcert_sign (const struct sigcert *cert,
     return strdup (sig_base64);
 }
 
-int sigcert_verify (const struct sigcert *cert,
-                    const char *sig_base64, uint8_t *buf, int len)
+int sigcert_verify_detached (const struct sigcert *cert,
+                             const char *sig_base64, uint8_t *buf, int len)
 {
     sign_t sig;
 

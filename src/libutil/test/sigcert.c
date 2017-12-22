@@ -208,7 +208,7 @@ void test_sign_verify (void)
 
     /* Sign message with cert1.
      */
-    sig = sigcert_sign (cert1, message, sizeof (message));
+    sig = sigcert_sign_detached (cert1, message, sizeof (message));
     ok (sig != NULL,
         "sigcert_sign works");
     diag ("%s", sig ? sig : "NULL");
@@ -217,38 +217,38 @@ void test_sign_verify (void)
      * cert2 cannot verify message signed by cert1.
      * cert1 cannot verify tampered message.
      */
-    ok (sigcert_verify (cert1, sig, message, sizeof (message)) == 0,
-        "sigcert_verify cert=good works");
+    ok (sigcert_verify_detached (cert1, sig, message, sizeof (message)) == 0,
+        "sigcert_verify_detached cert=good works");
     errno = 0;
-    ok (sigcert_verify (cert2, sig, message, sizeof (message)) < 0
+    ok (sigcert_verify_detached (cert2, sig, message, sizeof (message)) < 0
         && errno == EINVAL,
-        "sigcert_verify cert=bad fails with EINVAL");
+        "sigcert_verify_detached cert=bad fails with EINVAL");
     errno = 0;
-    ok (sigcert_verify (cert1, sig, tampered, sizeof (tampered)) < 0
+    ok (sigcert_verify_detached (cert1, sig, tampered, sizeof (tampered)) < 0
         && errno == EINVAL,
-        "sigcert_verify tampered fails with EINVAL");
+        "sigcert_verify_detached tampered fails with EINVAL");
     errno = 0;
     free (sig);
 
     /* Sign tampered message with cert2.
      * Verify that this signature cannot verify message.
      */
-    sig2 = sigcert_sign (cert1, tampered, sizeof (tampered));
+    sig2 = sigcert_sign_detached (cert1, tampered, sizeof (tampered));
     ok (sig2 != NULL,
-        "sigcert_sign works");
+        "sigcert_sign_detached works");
     errno = 0;
-    ok (sigcert_verify (cert1, sig2, message, sizeof (message)) < 0
+    ok (sigcert_verify_detached (cert1, sig2, message, sizeof (message)) < 0
         && errno == EINVAL,
-        "sigcert_verify sig=wrong fails with EINVAL");
+        "sigcert_verify_detached sig=wrong fails with EINVAL");
     free (sig2);
 
     /* Sign/verify a zero-length message.
      */
-    sig2 = sigcert_sign (cert1, NULL, 0);
+    sig2 = sigcert_sign_detached (cert1, NULL, 0);
     ok (sig2 != NULL,
-        "sigcert_sign works on zero-length message");
-    ok (sigcert_verify (cert1, sig2, NULL, 0) == 0,
-        "sigcert_verify works on zero-length message");
+        "sigcert_sign_detached works on zero-length message");
+    ok (sigcert_verify_detached (cert1, sig2, NULL, 0) == 0,
+        "sigcert_verify_detached works on zero-length message");
     free (sig2);
 
     sigcert_destroy (cert1);
@@ -350,29 +350,29 @@ void test_corner (void)
      */
     uint8_t data[] = "foo";
     errno = 0;
-    ok (sigcert_sign (NULL, NULL, 0) == NULL && errno == EINVAL,
-        "flux_sigcet_sign cert=NULL fails with EINVAL");
+    ok (sigcert_sign_detached (NULL, NULL, 0) == NULL && errno == EINVAL,
+        "flux_sigcert_sign_detached cert=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_sign (cert, data, -1) == NULL && errno == EINVAL,
-        "flux_sigcet_sign len<0 fails with EINVAL");
+    ok (sigcert_sign_detached (cert, data, -1) == NULL && errno == EINVAL,
+        "flux_sigcert_sign_detached len<0 fails with EINVAL");
     errno = 0;
-    ok (sigcert_sign (cert, NULL, 1) == NULL && errno == EINVAL,
-        "flux_sigcet_sign len>0 buf=NULL fails with EINVAL");
+    ok (sigcert_sign_detached (cert, NULL, 1) == NULL && errno == EINVAL,
+        "flux_sigcert_sign_detached len>0 buf=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_verify (NULL, "foo", NULL, 0) < 0 && errno == EINVAL,
-        "sigcert_verify cert=NULL fails with EINVAL");
+    ok (sigcert_verify_detached (NULL, "foo", NULL, 0) < 0 && errno == EINVAL,
+        "sigcert_verify_detached cert=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_verify (cert, NULL, NULL, 0) < 0 && errno == EINVAL,
-        "sigcert_verify sig=NULL fails with EINVAL");
+    ok (sigcert_verify_detached (cert, NULL, NULL, 0) < 0 && errno == EINVAL,
+        "sigcert_verify_detached sig=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_verify (cert, "foo", NULL, -1) < 0 && errno == EINVAL,
-        "sigcert_verify len<0 fails with EINVAL");
+    ok (sigcert_verify_detached (cert, "foo", NULL, -1) < 0 && errno == EINVAL,
+        "sigcert_verify_detached len<0 fails with EINVAL");
     errno = 0;
-    ok (sigcert_verify (cert, "foo", NULL, 1) < 0 && errno == EINVAL,
-        "sigcert_verify len>0 buf=NULL fails with EINVAL");
+    ok (sigcert_verify_detached (cert, "foo", NULL, 1) < 0 && errno == EINVAL,
+        "sigcert_verify_detached len>0 buf=NULL fails with EINVAL");
     errno = 0;
-    ok (sigcert_verify (cert, "....", NULL, 0) < 0 && errno == EINVAL,
-        "sigcert_verify sig=invalid fails with EINVAL");
+    ok (sigcert_verify_detached (cert, "....", NULL, 0) < 0 && errno == EINVAL,
+        "sigcert_verify_detached sig=invalid fails with EINVAL");
 
     /* encode/decode corner cases
      */
