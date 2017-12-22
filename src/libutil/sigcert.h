@@ -70,6 +70,24 @@ int sigcert_verify_detached (const struct sigcert *cert,
                              const char *signature,
                              const uint8_t *buf, int len);
 
+/* Calculate signature of initial NULL terminated string contents of buf,
+ * then append .SIGNATURE (as a base64 string), without exceeding its
+ * allocated size of 'buflen', including NULL termination.  Call
+ * sigcert_sign_length() beforehand to determine how large buf should be.
+ * Return 0 on success, -1 on failure with errno set.
+ */
+int sigcert_sign (const struct sigcert *cert, char *buf, int buflen);
+
+/* Return the total size needed to contain s and attached signature,
+ * including NULL termination.
+ */
+int sigcert_sign_length (const char *s);
+
+/* Verify a NULL terminated string 's' with attached signature.
+ * Return length of original string without .SIGNATURE (base64).
+ */
+int sigcert_verify (const struct sigcert *cert, const char *s);
+
 /* Use cert1 to sign cert2.
  * The signature covers public key and all metadata.
  * It does not cover secret key or existing signature, if any.
