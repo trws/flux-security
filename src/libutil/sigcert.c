@@ -765,7 +765,7 @@ bool sigcert_equal (const struct sigcert *cert1,
 }
 
 char *sigcert_sign_detached (const struct sigcert *cert,
-                             uint8_t *buf, int len)
+                             const uint8_t *buf, int len)
 {
     sign_t sig;
     sign_base64_t sig_base64;
@@ -783,15 +783,16 @@ char *sigcert_sign_detached (const struct sigcert *cert,
 }
 
 int sigcert_verify_detached (const struct sigcert *cert,
-                             const char *sig_base64, uint8_t *buf, int len)
+                             const char *signature,
+                             const uint8_t *buf, int len)
 {
     sign_t sig;
 
-    if (!cert || !sig_base64 || len < 0 || (len > 0 && buf == NULL)) {
+    if (!cert || !signature || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return -1;
     }
-    if (sigcert_base64_decode_sign (sig_base64, sig) < 0)
+    if (sigcert_base64_decode_sign (signature, sig) < 0)
         return -1;
     if (crypto_sign_verify_detached (sig, buf, len, cert->public_key) < 0) {
         errno = EINVAL;
