@@ -101,7 +101,7 @@ enum sigcert_meta_type {
 int sigcert_meta_set (struct sigcert *cert, const char *key,
                       enum sigcert_meta_type type, ...);
 
-/* Set meta value.
+/* Get meta value.
  * Returns 0 on success, -1 on failure with errno set.
  */
 int sigcert_meta_get (const struct sigcert *cert, const char *key,
