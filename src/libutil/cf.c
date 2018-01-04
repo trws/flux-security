@@ -54,7 +54,7 @@ void cf_destroy (cf_t *cf)
     }
 }
 
-cf_t *cf_copy (cf_t *cf)
+cf_t *cf_copy (const cf_t *cf)
 {
     cf_t *cpy;
 
@@ -114,7 +114,7 @@ const char *cf_typedesc (enum cf_type type)
     return "unknown";
 }
 
-enum cf_type cf_typeof (cf_t *cf)
+enum cf_type cf_typeof (const cf_t *cf)
 {
     if (!cf)
         return CF_UNKNOWN;
@@ -140,7 +140,7 @@ enum cf_type cf_typeof (cf_t *cf)
     }
 }
 
-cf_t *cf_get_in (cf_t *cf, const char *key)
+const cf_t *cf_get_in (const cf_t *cf, const char *key)
 {
     cf_t *val;
 
@@ -156,7 +156,7 @@ cf_t *cf_get_in (cf_t *cf, const char *key)
 
 }
 
-cf_t *cf_get_at (cf_t *cf, int index)
+const cf_t *cf_get_at (const cf_t *cf, int index)
 {
     cf_t *val;
 
@@ -171,30 +171,30 @@ cf_t *cf_get_at (cf_t *cf, int index)
     return val;
 }
 
-int64_t cf_int64 (cf_t *cf)
+int64_t cf_int64 (const cf_t *cf)
 {
     return cf ? json_integer_value (cf) : 0;
 }
 
-double cf_double (cf_t *cf)
+double cf_double (const cf_t *cf)
 {
     return cf ? json_real_value (cf) : 0.;
 }
 
-const char *cf_string (cf_t *cf)
+const char *cf_string (const cf_t *cf)
 {
     const char *s = cf ? json_string_value (cf) : NULL;
     return s ? s : "";
 }
 
-bool cf_bool (cf_t *cf)
+bool cf_bool (const cf_t *cf)
 {
     if (cf && json_typeof ((json_t *)cf) == JSON_TRUE)
         return true;
     return false;
 }
 
-time_t cf_timestamp (cf_t *cf)
+time_t cf_timestamp (const cf_t *cf)
 {
     time_t t;
     if (!cf || tomltk_json_to_epoch (cf, &t) < 0)
@@ -202,7 +202,7 @@ time_t cf_timestamp (cf_t *cf)
     return t;
 }
 
-int cf_array_size (cf_t *cf)
+int cf_array_size (const cf_t *cf)
 {
     return cf ? json_array_size (cf) : 0;
 }
@@ -341,13 +341,16 @@ static const struct cf_option *find_option (const struct cf_option opts[],
 /* Make sure all keys in 'cf' are known in 'opts'.
  * If 'anytab' is true, keys representing tables need not be known.
  */
-static int check_unknown_keys (cf_t *cf,
+static int check_unknown_keys (const cf_t *cf,
                                const struct cf_option opts[], bool anytab,
                                struct cf_error *error)
 {
     void *iter;
 
-    iter = json_object_iter (cf);
+    /* N.B. const is cast away for iteration, but object is not modified
+     * so this should be safe.
+     */
+    iter = json_object_iter ((json_t *)cf);
     while (iter) {
         const char *key = json_object_iter_key (iter);
         json_t *obj = json_object_get (cf, key);
@@ -359,12 +362,12 @@ static int check_unknown_keys (cf_t *cf,
                 return -1;
             }
         }
-        iter = json_object_iter_next (cf, iter);
+        iter = json_object_iter_next ((json_t *)cf, iter);
     }
     return 0;
 }
 
-static int check_expected_keys (cf_t *cf,
+static int check_expected_keys (const cf_t *cf,
                                 const struct cf_option opts[],
                                 struct cf_error *error)
 {
@@ -390,7 +393,7 @@ static int check_expected_keys (cf_t *cf,
     return 0;
 }
 
-int cf_check (cf_t *cf,
+int cf_check (const cf_t *cf,
               const struct cf_option opts[], int flags,
               struct cf_error *error)
 {
