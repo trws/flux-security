@@ -110,11 +110,14 @@ int tomltk_ts_to_epoch (toml_timestamp_t *ts, time_t *tp)
     return 0;
 }
 
-int tomltk_json_to_epoch (json_t *obj, time_t *tp)
+int tomltk_json_to_epoch (const json_t *obj, time_t *tp)
 {
     const char *s;
 
-    if (!obj || json_unpack (obj, "{s:s}", "iso-8601-ts", &s) < 0) {
+    /* N.B. 'O' specifier not used, hence obj is not in danger
+     * of being modified by json_unpack.
+     */
+    if (!obj || json_unpack ((json_t *)obj, "{s:s}", "iso-8601-ts", &s) < 0) {
         errno = EINVAL;
         return -1;
     }
