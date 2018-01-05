@@ -84,7 +84,8 @@ void cfdiag (int rc, const char *prefix, struct cf_error *error)
 
 void test_basic (void)
 {
-    cf_t *cf, *cf2;
+    cf_t *cf, *cf_cpy;
+    const cf_t *cf2;
     struct cf_error error;
     int rc;
     const char *s;
@@ -100,12 +101,12 @@ void test_basic (void)
 
     /* Copy a cf object.
      */
-    cf2 = cf_copy (cf);
-    ok (cf2 != NULL,
+    cf_cpy = cf_copy (cf);
+    ok (cf_cpy != NULL,
         "cf_copy works");
     ok (cf_typeof (cf) == CF_TABLE,
         "cf_typeof says copy is CF_TABLE");
-    cf_destroy (cf2);
+    cf_destroy (cf_cpy);
 
     /* Read some TOML into the cf top level table
      */
@@ -162,7 +163,8 @@ void test_basic (void)
 
 void test_multi (void)
 {
-    cf_t *cf, *cf2;
+    cf_t *cf;
+    const cf_t *cf2;
     int rc;
     struct cf_error error;
 
@@ -237,7 +239,7 @@ void test_multi (void)
 void test_corner (void)
 {
     cf_t *cf;
-    cf_t *cf_array;
+    const cf_t *cf_array;
     struct cf_error error;
 
     if (!(cf = cf_create ()))
@@ -263,8 +265,6 @@ void test_corner (void)
     ok (cf_update (NULL, NULL, 0, &error) < 0 && errno == EINVAL,
         "cf_update cf=NULL fails with EINVAL");
     errno = 0;
-    ok (cf_update (cf_array, NULL, 0, &error) < 0 && errno == EINVAL,
-        "cf_update cf=(not table) fails with EINVAL");
     ok (cf_update (cf, NULL, 0, &error) == 0,
         "cf_update buf=NULL works (no-op)");
     errno = 0;
@@ -432,7 +432,8 @@ void test_update_glob (void)
     char invalid[PATH_MAX + 1];
     char p [1024];
 
-    cf_t *cf, *cf2, *cf3;
+    cf_t *cf;
+    const cf_t *cf2, *cf3;
     struct cf_error error;
 
 

@@ -25,7 +25,7 @@ json_t *tomltk_table_to_json (toml_table_t *tab);
 /* Convert timestamp JSON object to a time_t (UTC).
  * Return 0 on success, or -1 on failure with errno set.
  */
-int tomltk_json_to_epoch (json_t *obj, time_t *t);
+int tomltk_json_to_epoch (const json_t *obj, time_t *t);
 
 /* Convert time_t (UTC) to a timestamp JSON object.
  * Return new object on success, NULL on failure with errno set.
