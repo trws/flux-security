@@ -5,11 +5,11 @@ AM_CFLAGS = \
 
 AM_LDFLAGS = \
 	$(CODE_COVERAGE_LIBS) \
-	$(JANSSON_LIBS) $(SODIUM_LIBS)
+	$(JANSSON_LIBS) $(SODIUM_LIBS) $(LIBUUID_LIBS)
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
-	$(JANSSON_CFLAGS) $(SODIUM_CFLAGS)
+	$(JANSSON_CFLAGS) $(SODIUM_CFLAGS) $(LIBUUID_CFLAGS)
 
 noinst_LTLIBRARIES = \
 	libutil.la
@@ -29,7 +29,9 @@ libutil_la_SOURCES = \
 	sigcert.c \
 	sigcert.h \
 	timestamp.c \
-	timestamp.h
+	timestamp.h \
+	ca.c \
+	ca.h
 
 TESTS = \
 	test_base64.t \
@@ -43,7 +45,7 @@ test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la \
 	$(top_builddir)/src/libtap/libtap.la \
-	$(JANSSON_LIBS)
+	$(JANSSON_LIBS) $(SODIUM_LIBS) $(LIBUUID_LIBS)
 
 test_cppflags = \
 	$(AM_CPPFLAGS)
