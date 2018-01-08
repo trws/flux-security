@@ -35,6 +35,10 @@ struct sigcert *sigcert_copy (const struct sigcert *cert);
  */
 void sigcert_forget_secret (struct sigcert *cert);
 
+/* Check if cert has secret key.
+ */
+bool sigcert_has_secret (const struct sigcert *cert);
+
 /* Load cert from file 'name.pub'.
  * If secret=true, load secret-key from 'name' also.
  */

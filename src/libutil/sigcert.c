@@ -171,6 +171,13 @@ void sigcert_forget_secret (struct sigcert *cert)
     }
 }
 
+bool sigcert_has_secret (const struct sigcert *cert)
+{
+    if (cert && cert->secret_valid)
+        return true;
+    return false;
+}
+
 static enum kv_type type_tokv (enum sigcert_meta_type type)
 {
     switch (type) {
