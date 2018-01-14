@@ -143,7 +143,7 @@ error:
     return NULL;
 }
 
-struct sigcert *sigcert_copy (struct sigcert *cert)
+struct sigcert *sigcert_copy (const struct sigcert *cert)
 {
     struct sigcert *cpy;
     struct kv *metacpy;

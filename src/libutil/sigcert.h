@@ -29,7 +29,7 @@ struct sigcert *sigcert_create (void);
 
 /* Copy cert.
  */
-struct sigcert *sigcert_copy (struct sigcert *cert);
+struct sigcert *sigcert_copy (const struct sigcert *cert);
 
 /* Drop secret key from cert.
  */
