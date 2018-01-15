@@ -31,7 +31,9 @@ libutil_la_SOURCES = \
 	timestamp.c \
 	timestamp.h \
 	ca.c \
-	ca.h
+	ca.h \
+	signer.c \
+	signer.h
 
 TESTS = \
 	test_base64.t \
