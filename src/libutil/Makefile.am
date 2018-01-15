@@ -39,7 +39,8 @@ TESTS = \
 	test_tomltk.t \
 	test_cf.t \
 	test_kv.t \
-	test_sigcert.t
+	test_sigcert.t \
+	test_ca.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -80,3 +81,7 @@ test_kv_t_CPPFLAGS = $(test_cppflags)
 test_sigcert_t_SOURCES = test/sigcert.c
 test_sigcert_t_LDADD = $(test_ldadd)
 test_sigcert_t_CPPFLAGS = $(test_cppflags)
+
+test_ca_t_SOURCES = test/ca.c
+test_ca_t_LDADD = $(test_ldadd)
+test_ca_t_CPPFLAGS = $(test_cppflags)
