@@ -350,7 +350,11 @@ void test_codec (void)
     cert_pub = sigcert_copy (cert);
     ok (cert_pub != NULL,
         "sigcert_copy worked");
+    ok (sigcert_has_secret (cert_pub) == true,
+        "sigcert_has_secret returns true before forget");
     sigcert_forget_secret (cert_pub);
+    ok (sigcert_has_secret (cert_pub) == false,
+        "sigcert_has_secret returns false after forget");
 
     /* Encode cert_pub, then decode as cert2.
      * Test for equality.
