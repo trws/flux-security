@@ -37,7 +37,6 @@
 /*  Static prototypes:
  */
 static void initialize_logging ();
-static void print_version (void);
 static int  imp_state_init (struct imp_state *imp, int argc, char **argv);
 
 int main (int argc, char *argv[])
@@ -48,12 +47,6 @@ int main (int argc, char *argv[])
 
     if (imp_state_init (&imp, argc, argv) < 0)
         imp_die (1, "Initialization error");
-
-    if (argc < 2)
-        imp_die (1, "IMP requires a command, master!");
-
-    if (argc == 2 && strncmp (argv[1], "version", 7) == 0)
-        print_version ();
 
     /*  Configuration:
      */
@@ -73,11 +66,6 @@ int main (int argc, char *argv[])
 
     imp_closelog ();
     exit (0);
-}
-
-static void print_version ()
-{
-    printf ("flux-imp v%s\n", PACKAGE_VERSION);
 }
 
 static int log_stderr (int level, const char *str,
