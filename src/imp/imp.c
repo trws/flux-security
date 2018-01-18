@@ -34,10 +34,13 @@
 #include "imp_state.h"
 #include "imp_log.h"
 
+extern const char *imp_config_pattern;
+
 /*  Static prototypes:
  */
 static void initialize_logging ();
 static int  imp_state_init (struct imp_state *imp, int argc, char **argv);
+static cf_t * imp_conf_load (const char *pattern);
 
 int main (int argc, char *argv[])
 {
@@ -50,7 +53,8 @@ int main (int argc, char *argv[])
 
     /*  Configuration:
      */
-    // Skip.
+    if (!(imp.conf = imp_conf_load (imp_config_pattern)))
+        imp_die (1, "Failed to load configuration");
 
     /*  Audit subsystem initialization
      */
@@ -64,6 +68,7 @@ int main (int argc, char *argv[])
      */
     // Skip.
 
+    cf_destroy (imp.conf);
     imp_closelog ();
     exit (0);
 }
@@ -93,6 +98,37 @@ static int imp_state_init (struct imp_state *imp, int argc, char *argv[])
     imp->argc = argc;
     imp->argv = argv;
     return (0);
+}
+
+/*
+ *  Load IMP configuration from glob(7) `pattern`. Fatal error if configuration
+ *   fails to load.
+ */
+static cf_t * imp_conf_load (const char *pattern)
+{
+    int rc;
+    struct cf_error err;
+    cf_t *cf = NULL;
+
+    if (pattern == NULL)
+        imp_die (1, "imp_conf_load: Internal error");
+
+    if (!(cf = cf_create ()))
+        return (NULL);
+
+    memset (&err, 0, sizeof (err));
+    if ((rc = cf_update_glob (cf, pattern, &err)) < 0) {
+        imp_warn ("loading config: %s: %d: %s",
+                 err.filename, err.lineno, err.errbuf);
+        cf_destroy (cf);
+        return (NULL);
+    }
+    else if (rc == 0) {
+        imp_warn ("%s: No config file(s) found");
+        cf_destroy (cf);
+        return (NULL);
+    }
+    return (cf);
 }
 
 /*

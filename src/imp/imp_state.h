@@ -25,9 +25,12 @@
 #ifndef HAVE_IMP_STATE_H
 #define HAVE_IMP_STATE_H 1
 
+#include "src/libutil/cf.h"
+
 struct imp_state {
     int        argc;
     char     **argv;        /* cmdline arguments from main() */
+    cf_t      *conf;        /* IMP configuration */
 };
 
 #endif /* !HAVE_IMP_STATE_H */
