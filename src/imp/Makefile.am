@@ -22,6 +22,9 @@ flux_imp_SOURCES = \
 	imp_log.h \
 	imp_log.c
 
+EXTRA_DIST = \
+	imp.conf.d
+
 TESTS = \
 	test_imp_log.t \
 	test_privsep.t \
