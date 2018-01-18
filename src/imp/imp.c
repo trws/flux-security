@@ -29,17 +29,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
+#include "imp_state.h"
 #include "imp_log.h"
 
 /*  Static prototypes:
  */
 static void initialize_logging ();
 static void print_version (void);
+static int  imp_state_init (struct imp_state *imp, int argc, char **argv);
 
 int main (int argc, char *argv[])
 {
+    struct imp_state imp;
+
     initialize_logging ();
+
+    if (imp_state_init (&imp, argc, argv) < 0)
+        imp_die (1, "Initialization error");
 
     if (argc < 2)
         imp_die (1, "IMP requires a command, master!");
@@ -91,6 +99,13 @@ static void initialize_logging (void)
     }
 }
 
+static int imp_state_init (struct imp_state *imp, int argc, char *argv[])
+{
+    memset (imp, 0, sizeof (*imp));
+    imp->argc = argc;
+    imp->argv = argv;
+    return (0);
+}
 
 /*
  * vi: ts=4 sw=4 expandtab

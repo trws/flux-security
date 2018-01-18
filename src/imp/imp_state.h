@@ -22,27 +22,12 @@
  *  See also:  http://www.gnu.org/licenses/
 \*****************************************************************************/
 
-#ifndef HAVE_IMPCMD_H
-#define HAVE_IMPCMD_H 1
+#ifndef HAVE_IMP_STATE_H
+#define HAVE_IMP_STATE_H 1
 
-#include "imp_state.h"
-
-typedef int (*imp_cmd_f) (struct imp_state *imp);
-
-struct impcmd {
-    const char *name;
-    imp_cmd_f child_fn;
-    imp_cmd_f parent_fn;
+struct imp_state {
+    int        argc;
+    char     **argv;        /* cmdline arguments from main() */
 };
 
-/*  Return unprivileged child version of IMP command with `name`, or NULL
- *   if no such command found.
- */
-imp_cmd_f imp_cmd_find_child (const char *name);
-
-/*  Return privileged parent version of IMP command with `name`, or NULL
- *   if no such command found.
- */
-imp_cmd_f imp_cmd_find_parent (const char *name);
-
-#endif /* !HAVE_IMPCMD_H */
+#endif /* !HAVE_IMP_STATE_H */
