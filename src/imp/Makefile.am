@@ -27,6 +27,8 @@ flux_imp_SOURCES = \
 	impcmd-list.c \
 	impcmd.c \
 	impcmd.h \
+	sudosim.c \
+	sudosim.h \
 	version.c \
 	testconfig.c
 
