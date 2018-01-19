@@ -1,4 +1,4 @@
-SUBDIRS =         src
+SUBDIRS =         src t
 ACLOCAL_AMFLAGS = -I config
 EXTRA_DIST = \
 	config/tap-driver.sh \
