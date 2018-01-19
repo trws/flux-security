@@ -22,6 +22,12 @@ flux_imp_SOURCES = \
 	imp_state.h \
 	imp_log.h \
 	imp_log.c \
+	privsep.c \
+	privsep.h \
+	impcmd-list.c \
+	impcmd.c \
+	impcmd.h \
+	version.c \
 	testconfig.c
 
 testconfig.c: $(top_builddir)/config/config.h
