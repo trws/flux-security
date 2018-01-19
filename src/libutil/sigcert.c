@@ -143,7 +143,7 @@ error:
     return NULL;
 }
 
-struct sigcert *sigcert_copy (struct sigcert *cert)
+struct sigcert *sigcert_copy (const struct sigcert *cert)
 {
     struct sigcert *cpy;
     struct kv *metacpy;
@@ -169,6 +169,13 @@ void sigcert_forget_secret (struct sigcert *cert)
         memset (cert->secret_key, 0, crypto_sign_SECRETKEYBYTES);
         cert->secret_valid = false;
     }
+}
+
+bool sigcert_has_secret (const struct sigcert *cert)
+{
+    if (cert && cert->secret_valid)
+        return true;
+    return false;
 }
 
 static enum kv_type type_tokv (enum sigcert_meta_type type)
@@ -764,8 +771,8 @@ bool sigcert_equal (const struct sigcert *cert1,
     return true;
 }
 
-char *sigcert_sign (const struct sigcert *cert,
-                    uint8_t *buf, int len)
+char *sigcert_sign_detached (const struct sigcert *cert,
+                             const uint8_t *buf, int len)
 {
     sign_t sig;
     sign_base64_t sig_base64;
@@ -782,22 +789,64 @@ char *sigcert_sign (const struct sigcert *cert,
     return strdup (sig_base64);
 }
 
-int sigcert_verify (const struct sigcert *cert,
-                    const char *sig_base64, uint8_t *buf, int len)
+int sigcert_verify_detached (const struct sigcert *cert,
+                             const char *signature,
+                             const uint8_t *buf, int len)
 {
     sign_t sig;
 
-    if (!cert || !sig_base64 || len < 0 || (len > 0 && buf == NULL)) {
+    if (!cert || !signature || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return -1;
     }
-    if (sigcert_base64_decode_sign (sig_base64, sig) < 0)
+    if (sigcert_base64_decode_sign (signature, sig) < 0)
         return -1;
     if (crypto_sign_verify_detached (sig, buf, len, cert->public_key) < 0) {
         errno = EINVAL;
         return -1;
     }
     return 0;
+}
+
+int sigcert_sign_length (const char *s)
+{
+    return sizeof (sign_base64_t) + 1 + (s ? strlen (s) : 0);
+}
+
+int sigcert_sign (const struct sigcert *cert, char *buf, int buflen)
+{
+    sign_t sig;
+    int len;
+
+    if (!cert || !cert->secret_valid || buflen < sigcert_sign_length (buf)) {
+        errno = EINVAL;
+        return -1;
+    }
+    len = buf ? strlen (buf) : 0;
+    if (crypto_sign_detached (sig, NULL, (unsigned char *)buf,
+                              len, cert->secret_key) < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    buf[len] = '.';
+    sigcert_base64_encode_sign (sig, &buf[len + 1]);
+    return 0;
+}
+
+int sigcert_verify (const struct sigcert *cert, const char *s)
+{
+    char *sig;
+    int length;
+
+    if (!(sig = strrchr (s, '.'))) {
+        errno = EINVAL;
+        return -1;
+    }
+    length = sig - s;
+    sig++;
+    if (sigcert_verify_detached (cert, sig, (uint8_t *)s, length) < 0)
+        return -1;
+    return length;
 }
 
 /* cert1 signs cert2.

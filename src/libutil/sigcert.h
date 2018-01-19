@@ -29,11 +29,15 @@ struct sigcert *sigcert_create (void);
 
 /* Copy cert.
  */
-struct sigcert *sigcert_copy (struct sigcert *cert);
+struct sigcert *sigcert_copy (const struct sigcert *cert);
 
 /* Drop secret key from cert.
  */
 void sigcert_forget_secret (struct sigcert *cert);
+
+/* Check if cert has secret key.
+ */
+bool sigcert_has_secret (const struct sigcert *cert);
 
 /* Load cert from file 'name.pub'.
  * If secret=true, load secret-key from 'name' also.
@@ -60,14 +64,33 @@ bool sigcert_equal (const struct sigcert *cert1,
 /* Return a detached signature (base64 string) over buf, len.
  * Caller must free.
  */
-char *sigcert_sign (const struct sigcert *cert,
-                    uint8_t *buf, int len);
+char *sigcert_sign_detached (const struct sigcert *cert,
+                             const uint8_t *buf, int len);
 
 /* Verify a detached signature (base64 string) over buf, len.
  * Returns 0 on success, -1 on failure.
  */
-int sigcert_verify (const struct sigcert *cert,
-                    const char *signature, uint8_t *buf, int len);
+int sigcert_verify_detached (const struct sigcert *cert,
+                             const char *signature,
+                             const uint8_t *buf, int len);
+
+/* Calculate signature of initial NULL terminated string contents of buf,
+ * then append .SIGNATURE (as a base64 string), without exceeding its
+ * allocated size of 'buflen', including NULL termination.  Call
+ * sigcert_sign_length() beforehand to determine how large buf should be.
+ * Return 0 on success, -1 on failure with errno set.
+ */
+int sigcert_sign (const struct sigcert *cert, char *buf, int buflen);
+
+/* Return the total size needed to contain s and attached signature,
+ * including NULL termination.
+ */
+int sigcert_sign_length (const char *s);
+
+/* Verify a NULL terminated string 's' with attached signature.
+ * Return length of original string without .SIGNATURE (base64).
+ */
+int sigcert_verify (const struct sigcert *cert, const char *s);
 
 /* Use cert1 to sign cert2.
  * The signature covers public key and all metadata.
@@ -101,7 +124,7 @@ enum sigcert_meta_type {
 int sigcert_meta_set (struct sigcert *cert, const char *key,
                       enum sigcert_meta_type type, ...);
 
-/* Set meta value.
+/* Get meta value.
  * Returns 0 on success, -1 on failure with errno set.
  */
 int sigcert_meta_get (const struct sigcert *cert, const char *key,
