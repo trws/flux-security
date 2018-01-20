@@ -4,11 +4,13 @@ T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 
 TESTS = \
 	t0000-sharness.t \
-	t0100-sudo-unit-tests.t
+	t0100-sudo-unit-tests.t \
+	t1000-imp-basic.t
 
 check_SCRIPTS = \
 	t0000-sharness.t \
-	t0100-sudo-unit-tests.t
+	t0100-sudo-unit-tests.t \
+	t1000-imp-basic.t
 
 EXTRA_DIST= \
 	sharness.sh \
