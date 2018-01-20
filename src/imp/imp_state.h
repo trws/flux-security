@@ -26,11 +26,13 @@
 #define HAVE_IMP_STATE_H 1
 
 #include "src/libutil/cf.h"
+#include "privsep.h"
 
 struct imp_state {
     int        argc;
     char     **argv;        /* cmdline arguments from main() */
     cf_t      *conf;        /* IMP configuration */
+    privsep_t *ps;          /* Privilege separation handle */
 };
 
 #endif /* !HAVE_IMP_STATE_H */
