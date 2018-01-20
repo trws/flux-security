@@ -32,6 +32,7 @@ before_install:
   - export PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$HOME/local/share/pkgconfig
 
 script:
+  - export FLUX_TESTS_LOGFILE=t
   # Force update to allow version m4 to work
   - ( git fetch --unshallow --tags || true )
   - ./autogen.sh
