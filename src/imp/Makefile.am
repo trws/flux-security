@@ -18,6 +18,7 @@ flux_imp_LDADD = \
 
 flux_imp_SOURCES = \
 	imp.c \
+	imp_state.h \
 	imp_log.h \
 	imp_log.c
 
