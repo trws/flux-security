@@ -25,9 +25,10 @@
 #ifndef HAVE_IMPCMD_H
 #define HAVE_IMPCMD_H 1
 
+#include "src/libutil/kv.h"
 #include "imp_state.h"
 
-typedef int (*imp_cmd_f) (struct imp_state *imp);
+typedef int (*imp_cmd_f) (struct imp_state *imp, struct kv *kv);
 
 struct impcmd {
     const char *name;

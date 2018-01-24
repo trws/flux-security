@@ -29,7 +29,8 @@
 #include <stdio.h>
 #include "impcmd.h"
 
-int imp_cmd_version (struct imp_state *imp __attribute__ ((unused)))
+int imp_cmd_version (struct imp_state *imp __attribute__ ((unused)),
+                     struct kv *kv __attribute__ ((unused)))
 {
     printf ("flux-imp v%s\n", PACKAGE_VERSION);
     return (0);

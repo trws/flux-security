@@ -190,12 +190,27 @@ static void initialize_sudo_support (cf_t *conf)
     }
 }
 
+static struct kv * kv_encode_cmd (const char * cmd)
+{
+    struct kv *kv = kv_create ();
+    if (kv == NULL)
+        return (NULL);
+    if (kv_put (kv, "cmd", KV_STRING, cmd) < 0) {
+        kv_destroy (kv);
+        return (NULL);
+    }
+    return (kv);
+}
+
+
 /*  IMP unprivileged child.
  */
 static void imp_child (privsep_t *ps, void *arg)
 {
+    struct kv *kv;
     struct imp_state *imp = arg;
     imp_cmd_f cmd = NULL;
+
     assert (imp != NULL);
 
     /*  Be sure to assign privsep handle to imp->ps since this has not
@@ -209,17 +224,30 @@ static void imp_child (privsep_t *ps, void *arg)
     if (!(cmd = imp_cmd_find_child (imp->argv[1])))
         imp_die (1, "Unknown IMP command: %s", imp->argv[1]);
 
-    if (((*cmd) (imp)) < 0)
+    if (!(kv = kv_encode_cmd (imp->argv[1])))
+        imp_die (1, "Failed to encode IMP command: %s", strerror (errno));
+
+    if (((*cmd) (imp, kv)) < 0)
         exit (1);
+
+    kv_destroy (kv);
 }
 
 static void imp_parent (struct imp_state *imp)
 {
-    char buf [4096];
-    if (privsep_read (imp->ps, buf, sizeof (buf)) < 0)
-        imp_die (1, "privsep_read: %s", strerror (errno));
+    struct kv * kv = privsep_read_kv (imp->ps);
+    if (kv) {
+        const char *cmdname = NULL;
+        imp_cmd_f cmd = NULL;
+        if (kv_get (kv, "cmd", KV_STRING, &cmdname) < 0)
+            imp_die (1, "Failed to read command from privsep child");
+        if ((cmd = imp_cmd_find_parent (cmdname)) != NULL) {
+            if (((*cmd) (imp, kv)) < 0)
+                exit (1);
+        }
+        kv_destroy (kv);
+    }
 }
-
 
 /*
  * vi: ts=4 sw=4 expandtab
