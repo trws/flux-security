@@ -30,6 +30,7 @@ flux_imp_SOURCES = \
 	sudosim.c \
 	sudosim.h \
 	version.c \
+	whoami.c \
 	testconfig.c
 
 testconfig.c: $(top_builddir)/config/config.h
