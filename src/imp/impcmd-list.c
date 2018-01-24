@@ -34,6 +34,8 @@ extern int imp_cmd_version (struct imp_state *imp, struct kv *);
  *
  */
 struct impcmd impcmd_list[] = {
+	{ "version",
+	  imp_cmd_version, NULL },
 	{ NULL, NULL, NULL}
 };
 
