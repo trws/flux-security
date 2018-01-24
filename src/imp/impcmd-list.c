@@ -26,6 +26,8 @@
 #include "impcmd.h"
 
 extern int imp_cmd_version (struct imp_state *imp, struct kv *);
+extern int imp_whoami_unprivileged (struct imp_state *imp, struct kv *);
+extern int imp_whoami_privileged (struct imp_state *imp, struct kv *);
 
 /*  List of supported imp commands, curated by hand for now.
  *   For each named command, the `child_fn` runs unprivileged and the
@@ -36,6 +38,9 @@ extern int imp_cmd_version (struct imp_state *imp, struct kv *);
 struct impcmd impcmd_list[] = {
 	{ "version",
 	  imp_cmd_version, NULL },
+	{ "whoami",
+	  imp_whoami_unprivileged,
+      imp_whoami_privileged },
 	{ NULL, NULL, NULL}
 };
 
