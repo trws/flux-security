@@ -29,32 +29,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <assert.h>
 
+#include "imp_state.h"
 #include "imp_log.h"
+#include "impcmd.h"
+#include "sudosim.h"
+
+extern const char *imp_config_pattern;
 
 /*  Static prototypes:
  */
-static void print_version (void);
-static int  log_stderr (int level, const char *str, void *arg);
+static void initialize_logging ();
+static int  imp_state_init (struct imp_state *imp, int argc, char **argv);
+static cf_t * imp_conf_load (const char *pattern);
+static bool imp_is_privileged ();
+static bool imp_is_setuid ();
+static void initialize_sudo_support ();
+
+static void imp_child (privsep_t *ps, void *arg);
+static void imp_parent (struct imp_state *imp);
 
 int main (int argc, char *argv[])
 {
-    imp_openlog ();
+    struct imp_state imp;
 
-    if (imp_log_add ("stderr", IMP_LOG_INFO, log_stderr, NULL) < 0) {
-        fprintf (stderr, "flux-imp: Failed to initialize logging. Aborting.\n");
-        exit (1);
-    }
+    initialize_logging ();
 
-    if (argc < 2)
-        imp_die (1, "IMP requires a command, master!");
-
-    if (argc == 2 && strncmp (argv[1], "version", 7) == 0)
-        print_version ();
+    if (imp_state_init (&imp, argc, argv) < 0)
+        imp_die (1, "Initialization error");
 
     /*  Configuration:
      */
-    // Skip.
+    if (!(imp.conf = imp_conf_load (imp_config_pattern)))
+        imp_die (1, "Failed to load configuration");
 
     /*  Audit subsystem initialization
      */
@@ -62,19 +72,32 @@ int main (int argc, char *argv[])
 
     /*  Security architecture initialization
      */
-    // Skip.
+    if (imp_is_privileged ()) {
 
-    /*  Parse command line and run subcommand
-     */
-    // Skip.
+        /*  Simulate setuid under sudo(8) if configured */
+        initialize_sudo_support (imp.conf);
 
+        if (!imp_is_setuid ())
+            imp_die (1, "Refusing to run as root");
+
+        /*  Initialize privilege separation (required for now)
+         */
+        if (!(imp.ps = privsep_init (imp_child, &imp)))
+            imp_die (1, "Privilege separation initialization failed");
+        imp_parent (&imp);
+
+        /* Parent returns.. */
+        if (privsep_destroy (imp.ps) < 0)
+            imp_warn ("privsep_destroy: %s", strerror (errno));
+    }
+    else {
+        /*  Not running with privilege, run child half of function only */
+        imp_child (NULL, &imp);
+    }
+
+    cf_destroy (imp.conf);
     imp_closelog ();
     exit (0);
-}
-
-static void print_version ()
-{
-    printf ("flux-imp v%s\n", PACKAGE_VERSION);
 }
 
 static int log_stderr (int level, const char *str,
@@ -87,6 +110,144 @@ static int log_stderr (int level, const char *str,
     return (0);
 }
 
+static void initialize_logging (void)
+{
+    imp_openlog ();
+    if (imp_log_add ("stderr", IMP_LOG_INFO, log_stderr, NULL) < 0) {
+        fprintf (stderr, "flux-imp: Fatal: Failed to initialize logging.\n");
+        exit (1);
+    }
+}
+
+static int imp_state_init (struct imp_state *imp, int argc, char *argv[])
+{
+    memset (imp, 0, sizeof (*imp));
+    imp->argc = argc;
+    imp->argv = argv;
+    return (0);
+}
+
+/*
+ *  Load IMP configuration from glob(7) `pattern`. Fatal error if configuration
+ *   fails to load.
+ */
+static cf_t * imp_conf_load (const char *pattern)
+{
+    int rc;
+    struct cf_error err;
+    cf_t *cf = NULL;
+
+    if (pattern == NULL)
+        imp_die (1, "imp_conf_load: Internal error");
+
+    if (!(cf = cf_create ()))
+        return (NULL);
+
+    memset (&err, 0, sizeof (err));
+    if ((rc = cf_update_glob (cf, pattern, &err)) < 0) {
+        imp_warn ("loading config: %s: %d: %s",
+                 err.filename, err.lineno, err.errbuf);
+        cf_destroy (cf);
+        return (NULL);
+    }
+    else if (rc == 0) {
+        imp_warn ("%s: No config file(s) found");
+        cf_destroy (cf);
+        return (NULL);
+    }
+    return (cf);
+}
+
+/*
+ *  Return true if effective UID is 0.
+ */
+static bool imp_is_privileged ()
+{
+    return (geteuid() == 0);
+}
+
+/*
+ *  Return true if effective UID is 0, but real UID is non-zero
+ */
+static bool imp_is_setuid ()
+{
+    return (geteuid() == 0 && getuid() > 0);
+}
+
+/*  Simulate setuid installation when run under sudo if "allow-sudo" is
+ *   set to true in configuration. If `allow-sudo` is not set and the
+ *   process appears to be run under sudo, or the sudo simulate call fails
+ *   then this is a fatal error.
+ */
+static void initialize_sudo_support (cf_t *conf)
+{
+    const cf_t *cf;
+    if (sudo_is_active ()) {
+        if (!(cf = cf_get_in (conf, "allow-sudo")) || !cf_bool (cf))
+            imp_die (1, "sudo support not enabled");
+        else if (sudo_simulate_setuid () < 0)
+            imp_die (1, "Failed to enable sudo support");
+    }
+}
+
+static struct kv * kv_encode_cmd (const char * cmd)
+{
+    struct kv *kv = kv_create ();
+    if (kv == NULL)
+        return (NULL);
+    if (kv_put (kv, "cmd", KV_STRING, cmd) < 0) {
+        kv_destroy (kv);
+        return (NULL);
+    }
+    return (kv);
+}
+
+
+/*  IMP unprivileged child.
+ */
+static void imp_child (privsep_t *ps, void *arg)
+{
+    struct kv *kv;
+    struct imp_state *imp = arg;
+    imp_cmd_f cmd = NULL;
+
+    assert (imp != NULL);
+
+    /*  Be sure to assign privsep handle to imp->ps since this has not
+     *   been done yet (only in parent)
+     */
+    imp->ps = ps;
+
+    if (imp->argc <= 1)
+        imp_die (1, "command required");
+
+    if (!(cmd = imp_cmd_find_child (imp->argv[1])))
+        imp_die (1, "Unknown IMP command: %s", imp->argv[1]);
+
+    if (!(kv = kv_encode_cmd (imp->argv[1])))
+        imp_die (1, "Failed to encode IMP command: %s", strerror (errno));
+
+    if (((*cmd) (imp, kv)) < 0)
+        exit (1);
+
+    kv_destroy (kv);
+}
+
+static void imp_parent (struct imp_state *imp)
+{
+    struct kv * kv = privsep_read_kv (imp->ps);
+    if (kv) {
+        const char *cmdname = NULL;
+        imp_cmd_f cmd = NULL;
+        if (kv_get (kv, "cmd", KV_STRING, &cmdname) < 0)
+            imp_die (1, "Failed to read command from privsep child");
+        if ((cmd = imp_cmd_find_parent (cmdname)) != NULL) {
+            if (((*cmd) (imp, kv)) < 0)
+                exit (1);
+        }
+        kv_destroy (kv);
+    }
+}
 
 /*
  * vi: ts=4 sw=4 expandtab

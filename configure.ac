@@ -80,6 +80,7 @@ AX_CODE_COVERAGE
 #
 AC_CONFIG_FILES( \
   Makefile \
+  t/Makefile \
   src/Makefile \
   src/lib/Makefile \
   src/libtap/Makefile \

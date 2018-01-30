@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <time.h> // time_t
 
 enum kv_type {
