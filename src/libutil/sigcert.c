@@ -376,7 +376,7 @@ static int sigcert_fwrite_secret (const struct sigcert *cert, FILE *fp)
 
 /* Write public cert contents (not secret-key) to 'fp' in TOML format.
  */
-static int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
+int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
 {
     const char *key = NULL;
 
