@@ -32,7 +32,8 @@ flux_imp_SOURCES = \
 	version.c \
 	whoami.c \
 	testconfig.h \
-	testconfig.c
+	testconfig.c \
+	casign.c
 
 testconfig.o: testconfig.h
 testconfig.h: $(top_builddir)/config/config.h
