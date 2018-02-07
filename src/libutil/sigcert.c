@@ -583,8 +583,9 @@ inval:
 
 /* Read public cert contents from 'fp' in TOML format.
  */
-static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
+struct sigcert *sigcert_fread_public (FILE *fp)
 {
+    struct sigcert *cert;
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
     toml_table_t *meta_table;
@@ -593,6 +594,8 @@ static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
     int i;
     char errbuf[200];
 
+    if (!(cert = sigcert_alloc ()))
+        return NULL;
     if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
         goto inval;
 
@@ -619,11 +622,12 @@ static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
         cert->signature_valid = true;
     }
     toml_free (cert_table);
-    return 0;
+    return cert;
 inval:
     toml_free (cert_table);
+    sigcert_destroy (cert);
     errno = EINVAL;
-    return -1;
+    return NULL;
 }
 
 struct sigcert *sigcert_load (const char *name, bool secret)
@@ -637,12 +641,10 @@ struct sigcert *sigcert_load (const char *name, bool secret)
         goto inval;
     if (snprintf (name_pub, PATH_MAX + 1, "%s.pub", name) >= PATH_MAX + 1)
         goto inval;
-    if (!(cert = sigcert_alloc ()))
-        return NULL;
     // name.pub - public
     if (!(fp = fopen (name_pub, "r")))
         goto error;
-    if (sigcert_fread_public (cert, fp) < 0)
+    if (!(cert = sigcert_fread_public (fp)))
         goto error;
     if (fclose (fp) < 0)
         goto error;
