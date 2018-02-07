@@ -12,6 +12,20 @@ check_SCRIPTS = \
 	t0100-sudo-unit-tests.t \
 	t1000-imp-basic.t
 
+check_PROGRAMS = \
+	src/keygen
+
+test_cppflags = \
+	-I$(top_srcdir)
+
+test_ldadd = \
+	$(top_builddir)/src/libutil/libutil.la \
+	$(top_builddir)/src/libtomlc99/libtomlc99.la
+
+src_keygen_SOURCES = src/keygen.c
+src_keygen_CPPFLAGS = $(test_cppflags)
+src_keygen_LDADD = $(test_ldadd)
+
 EXTRA_DIST= \
 	sharness.sh \
 	sharness.d \
