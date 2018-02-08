@@ -13,7 +13,8 @@ check_SCRIPTS = \
 	t1000-imp-basic.t
 
 check_PROGRAMS = \
-	src/keygen
+	src/keygen \
+	src/certutil
 
 test_cppflags = \
 	-I$(top_srcdir)
@@ -25,6 +26,10 @@ test_ldadd = \
 src_keygen_SOURCES = src/keygen.c
 src_keygen_CPPFLAGS = $(test_cppflags)
 src_keygen_LDADD = $(test_ldadd)
+
+src_certutil_SOURCES = src/certutil.c
+src_certutil_CPPFLAGS = $(test_cppflags)
+src_certutil_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \
