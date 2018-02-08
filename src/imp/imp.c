@@ -38,7 +38,10 @@
 #include "impcmd.h"
 #include "sudosim.h"
 
-extern const char *imp_config_pattern;
+/*
+ *  External function used to return current default config pattern.
+ */
+extern const char *imp_get_config_pattern (void);
 
 /*  Static prototypes:
  */
@@ -63,7 +66,7 @@ int main (int argc, char *argv[])
 
     /*  Configuration:
      */
-    if (!(imp.conf = imp_conf_load (imp_config_pattern)))
+    if (!(imp.conf = imp_conf_load (imp_get_config_pattern ())))
         imp_die (1, "Failed to load configuration");
 
     /*  Audit subsystem initialization
