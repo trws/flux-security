@@ -1,3 +1,12 @@
+AM_CFLAGS = \
+	$(WARNING_CFLAGS) \
+	$(CODE_COVERAGE_CFLAGS)
+
+AM_LDFLAGS = \
+	$(CODE_COVERAGE_LIBS)
+
+AM_CPPFLAGS =
+
 TEST_EXTENSIONS = .t
 T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 	$(top_srcdir)/config/tap-driver.sh
@@ -21,7 +30,8 @@ check_PROGRAMS = \
 	src/cf
 
 test_cppflags = \
-	-I$(top_srcdir)
+	-I$(top_srcdir) \
+	$(AM_CPPFLAGS)
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
