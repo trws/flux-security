@@ -24,8 +24,24 @@ test_expect_success 'flux-imp returns error when run with no args' '
 test_expect_success 'flux-imp version works' '
 	$flux_imp version | grep "flux-imp v"
 '
+test_expect_success 'FLUX_IMP_CONFIG_PATTERN works for test flux-imp' '
+	( export FLUX_IMP_CONFIG_PATTERN=/noexist &&
+        test_must_fail  $flux_imp version 2>config-reset.error ) &&
+	grep "No config file" config-reset.error
+'
+test_expect_success 'Bad IMP config generates error' '
+	echo "bad =" > bad.toml &&
+	( export FLUX_IMP_CONFIG_PATTERN=bad.toml &&
+	  test_must_fail $flux_imp version 2>bad-config.error ) &&
+	grep "loading config: bad.toml: 1: syntax error" bad-config.error
+'
 test_expect_success SUDO 'flux-imp version works under sudo' '
 	sudo $flux_imp version | grep "flux-imp v"
+'
+test_expect_success SUDO 'flux-imp fails under sudo if allow-sudo != true' '
+	echo "allow-sudo = false" > nosudo.toml &&
+	test_expect_code 1 \
+	  sudo FLUX_IMP_CONFIG_PATTERN=nosudo.toml $flux_imp version
 '
 test_expect_success SUDO 'flux-imp generates error if SUDO_USER is invalid' '
 	test_expect_code 1 sudo SUDO_USER=invalid $flux_imp version
