@@ -15,7 +15,8 @@ check_SCRIPTS = \
 check_PROGRAMS = \
 	src/keygen \
 	src/certutil \
-	src/ca
+	src/ca \
+	src/cf
 
 test_cppflags = \
 	-I$(top_srcdir)
@@ -36,6 +37,10 @@ src_certutil_LDADD = $(test_ldadd)
 src_ca_SOURCES = src/ca.c
 src_ca_CPPFLAGS = $(test_cppflags)
 src_ca_LDADD = $(test_ldadd)
+
+src_cf_SOURCES = src/cf.c
+src_cf_CPPFLAGS = $(test_cppflags)
+src_cf_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \
