@@ -32,16 +32,16 @@ void imp_openlog ();
 void imp_closelog ();
 
 /*  Say a message to standard IMP logging destination(s) */
-void imp_say (const char *fmt, ...);
+void imp_say (const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 /*  Emit warning to IMP logging destination(s) */
-void imp_warn (const char *fmt, ...);
+void imp_warn (const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 /*  Issue a debug message to IMP logging destination(s) */
-void imp_debug (const char *fmt, ...);
+void imp_debug (const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 /*  Print an error to IMP logging destination and exit with exit `code` */
-void imp_die (int code, const char *fmt, ...);
+void imp_die (int code, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
 
 /*
  *  Logging output provider prototype:
