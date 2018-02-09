@@ -154,7 +154,7 @@ static cf_t * imp_conf_load (const char *pattern)
         return (NULL);
     }
     else if (rc == 0) {
-        imp_warn ("%s: No config file(s) found");
+        imp_warn ("%s: No config file(s) found", pattern);
         cf_destroy (cf);
         return (NULL);
     }
