@@ -31,15 +31,17 @@ flux_imp_SOURCES = \
 	sudosim.h \
 	version.c \
 	whoami.c \
+	testconfig.h \
 	testconfig.c
 
-testconfig.c: $(top_builddir)/config/config.h
+testconfig.o: testconfig.h
+testconfig.h: $(top_builddir)/config/config.h
 	@(confdir=`cd $(srcdir) && pwd`/imp.conf.d; \
 	  echo "const char *imp_config_pattern = \"$$confdir/*.toml\";" \
-	 )> testconfig.c
+	 )> testconfig.h
 
 MOSTLYCLEANFILES = \
-	testconfig.c
+	testconfig.h
 
 EXTRA_DIST = \
 	imp.conf.d

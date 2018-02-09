@@ -89,7 +89,7 @@ void drop_privileges ()
 
      /*  Verify privilege cannot be restored */
     if (setreuid (-1, 0) == 0)
-        imp_die (1, "irreversible switch to uid %ld failed");
+        imp_die (1, "irreversible switch to uid %ju failed", (uintmax_t) ruid);
 }
 
 static void child_pfds_setup (privsep_t *ps)

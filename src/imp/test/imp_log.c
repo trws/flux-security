@@ -111,7 +111,7 @@ int main (void)
     /*  Test log output truncation */
     char buf [8192];
     reset_logbuf ();
-    imp_say (long_string (buf, 4200));
+    imp_say ("%s", long_string (buf, 4200));
     rc = strlen (testbuf);
     ok (rc > 0, "very long log message gets written (len = %d)", rc);
     ok (testbuf[rc - 1] == '+', "very long log message is truncated");
