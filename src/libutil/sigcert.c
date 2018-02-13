@@ -142,6 +142,8 @@ struct sigcert *sigcert_create (void)
         goto error;
     if (crypto_sign_keypair (cert->public_key, cert->secret_key) < 0)
         goto error;
+    if (sigcert_meta_set (cert, "algorithm", SM_STRING, "ed25519") < 0)
+        goto error;
     cert->secret_valid = true;
     return cert;
 error:
