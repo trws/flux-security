@@ -910,9 +910,8 @@ int sigcert_verify (const struct sigcert *cert, const char *s)
     return length;
 }
 
-/* cert1 signs cert2.
- * Dump cert2 as JSON in a repeatable way, excluding secret + signature,
- * sign with cert1.  Add 'signature' attribute to [curve] stanza.
+/* Serialize cert2, excluding secret + signature, sign with cert1.
+ * Add 'signature' attribute to [curve] stanza.
  */
 int sigcert_sign_cert (const struct sigcert *cert1,
                        struct sigcert *cert2)
