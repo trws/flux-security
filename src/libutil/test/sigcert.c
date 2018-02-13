@@ -193,6 +193,44 @@ void test_load_store (void)
     cleanup_keypath ("foo.pub");
 }
 
+void test_fread_fwrite (void)
+{
+    struct sigcert *cert;
+    struct sigcert *cert2;
+    const char *name;
+    FILE *fp;
+
+    name = new_keypath ("test");
+
+    if (!(cert = sigcert_create ()))
+        BAIL_OUT ("sigcert_create: %s", strerror (errno));
+    sigcert_forget_secret (cert);
+
+    /* write cert to name */
+    if (!(fp = fopen (name, "w+")))
+        BAIL_OUT ("fopen %s: %s", name, strerror (errno));
+    ok (sigcert_fwrite_public (cert, fp) == 0,
+        "sigcert_fwrite_public works");
+    if (fclose (fp) != 0)
+        BAIL_OUT ("fclose %s: %s", name, strerror (errno));
+
+    /* read cert2 from name */
+    if (!(fp = fopen (name, "r")))
+        BAIL_OUT ("fopen %s: %s", name, strerror (errno));
+    cert2 = sigcert_fread_public (fp);
+    ok (cert2 != NULL,
+        "sigcert_fread_public works");
+    fclose (fp);
+
+    /* compare */
+    ok (sigcert_equal (cert, cert2),
+        "new cert is identical to original");
+
+    sigcert_destroy (cert);
+
+    cleanup_keypath ("test");
+}
+
 void test_sign_verify_detached (void)
 {
     struct sigcert *cert1;
@@ -824,6 +862,7 @@ int main (int argc, char *argv[])
     test_corner ();
     test_sign_cert ();
     test_badcert ();
+    test_fread_fwrite ();
 
     cleanup_scratchdir ();
     done_testing ();

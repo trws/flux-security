@@ -28,6 +28,8 @@
 extern int imp_cmd_version (struct imp_state *imp, struct kv *);
 extern int imp_whoami_unprivileged (struct imp_state *imp, struct kv *);
 extern int imp_whoami_privileged (struct imp_state *imp, struct kv *);
+extern int imp_casign_unprivileged (struct imp_state *imp, struct kv *);
+extern int imp_casign_privileged (struct imp_state *imp, struct kv *);
 
 /*  List of supported imp commands, curated by hand for now.
  *   For each named command, the `child_fn` runs unprivileged and the
@@ -41,6 +43,9 @@ struct impcmd impcmd_list[] = {
 	{ "whoami",
 	  imp_whoami_unprivileged,
       imp_whoami_privileged },
+	{ "casign",
+	  imp_casign_unprivileged,
+      imp_casign_privileged },
 	{ NULL, NULL, NULL}
 };
 

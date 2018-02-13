@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* Certificate class for signing/verification.
  *
@@ -47,6 +48,14 @@ struct sigcert *sigcert_load (const char *name, bool secret);
 /* Store cert to 'name' and 'name.pub'.
  */
 int sigcert_store (const struct sigcert *cert, const char *name);
+
+/* Write public portion of cert to 'fp'.
+ */
+int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp);
+
+/* Read public portion of cert from 'fp'.
+ */
+struct sigcert *sigcert_fread_public (FILE *fp);
 
 /* Decode kv buffer to cert.
  */

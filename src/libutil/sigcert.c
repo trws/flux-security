@@ -46,6 +46,12 @@
 
 #include "sigcert.h"
 
+/* Place an upper limit on size of a cert that can be read in.
+ * If libtomlc99 integer byte offsets wrap, there will be segfaults.
+ * If that ever gets fixed, we would OOM.
+ */
+static const size_t cert_read_limit = (1024*1024*10); // 10mb
+
 /* Define some handy types for fixed length keys and their base64 encodings.
  * N.B. macro versions of base64_encode_length() and base64_decode_length()
  * were defined so these types can be declared in a struct or on the stack.
@@ -376,7 +382,7 @@ static int sigcert_fwrite_secret (const struct sigcert *cert, FILE *fp)
 
 /* Write public cert contents (not secret-key) to 'fp' in TOML format.
  */
-static int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
+int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
 {
     const char *key = NULL;
 
@@ -555,6 +561,47 @@ done:
     return rc;
 }
 
+/* Read NULL-terminated buffer, up to 'limit' bytes in length, including NULL.
+ */
+static char *freads_limited (FILE *fp, size_t limit)
+{
+    const size_t chunksz = 1024;
+    char *buf = NULL;
+    size_t bufsz = 0;
+    size_t count = 0;
+    int saved_errno;
+
+    if (!fp)
+        goto inval;
+    if (!(buf = malloc (chunksz)))
+        return NULL;
+    bufsz += chunksz;
+    while (!feof (fp)) {
+        if (bufsz - count <= 1) { // need a min of NULL + 1 char to continue
+            char *newbuf;
+            if (!(newbuf = realloc (buf, bufsz + chunksz)))
+                goto error;
+            buf = newbuf;
+            bufsz += chunksz;
+        }
+        count += fread (buf + count, 1, bufsz - count - 1, fp); // reserve NULL
+        if (ferror (fp))
+            goto error;
+        if (count > limit)
+            goto inval;
+    }
+    assert (count < bufsz);
+    buf[count] = '\0';
+    return buf;
+inval:
+    errno = EINVAL;
+error:
+    saved_errno = errno;
+    free (buf);
+    errno = saved_errno;
+    return NULL;
+}
+
 /* Read in secret-key.
  */
 static int sigcert_fread_secret (struct sigcert *cert, FILE *fp)
@@ -563,8 +610,11 @@ static int sigcert_fread_secret (struct sigcert *cert, FILE *fp)
     toml_table_t *curve_table;
     const char *raw;
     char errbuf[200];
+    char *conf;
 
-    if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
+    if (!(conf = freads_limited (fp, cert_read_limit)))
+        return -1;
+    if (!(cert_table = toml_parse (conf, errbuf, sizeof (errbuf))))
         goto inval;
     if (!(curve_table = toml_table_in (cert_table, "curve")))
         goto inval;
@@ -573,9 +623,11 @@ static int sigcert_fread_secret (struct sigcert *cert, FILE *fp)
     if (parse_toml_secret_key (raw, cert->secret_key) < 0)
         goto inval;
     cert->secret_valid = true;
+    free (conf);
     toml_free (cert_table);
     return 0;
 inval:
+    free (conf);
     toml_free (cert_table);
     errno = EINVAL;
     return -1;
@@ -583,8 +635,9 @@ inval:
 
 /* Read public cert contents from 'fp' in TOML format.
  */
-static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
+struct sigcert *sigcert_fread_public (FILE *fp)
 {
+    struct sigcert *cert;
     toml_table_t *cert_table = NULL;
     toml_table_t *curve_table;
     toml_table_t *meta_table;
@@ -592,8 +645,15 @@ static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
     const char *raw;
     int i;
     char errbuf[200];
+    char *conf;
 
-    if (!(cert_table = toml_parse_file (fp, errbuf, sizeof (errbuf))))
+    if (!(cert = sigcert_alloc ()))
+        return NULL;
+    if (!(conf = freads_limited (fp, cert_read_limit))) {
+        sigcert_destroy (cert);
+        return NULL;
+    }
+    if (!(cert_table = toml_parse (conf, errbuf, sizeof (errbuf))))
         goto inval;
 
     // [metadata]
@@ -618,12 +678,15 @@ static int sigcert_fread_public (struct sigcert *cert, FILE *fp)
             goto inval;
         cert->signature_valid = true;
     }
+    free (conf);
     toml_free (cert_table);
-    return 0;
+    return cert;
 inval:
+    free (conf);
     toml_free (cert_table);
+    sigcert_destroy (cert);
     errno = EINVAL;
-    return -1;
+    return NULL;
 }
 
 struct sigcert *sigcert_load (const char *name, bool secret)
@@ -637,12 +700,10 @@ struct sigcert *sigcert_load (const char *name, bool secret)
         goto inval;
     if (snprintf (name_pub, PATH_MAX + 1, "%s.pub", name) >= PATH_MAX + 1)
         goto inval;
-    if (!(cert = sigcert_alloc ()))
-        return NULL;
     // name.pub - public
     if (!(fp = fopen (name_pub, "r")))
         goto error;
-    if (sigcert_fread_public (cert, fp) < 0)
+    if (!(cert = sigcert_fread_public (fp)))
         goto error;
     if (fclose (fp) < 0)
         goto error;
