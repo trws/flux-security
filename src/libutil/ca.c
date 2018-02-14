@@ -35,6 +35,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <uuid.h>
+#include <assert.h>
 
 #include "ca.h"
 #include "cf.h"
@@ -128,36 +129,20 @@ void ca_destroy (struct ca *ca)
     }
 }
 
-
-int ca_sign (const struct ca *ca, struct sigcert *cert,
-             int64_t ttl, int64_t userid, ca_error_t e)
+static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
+                      struct sigcert *cert, int64_t ttl, int64_t userid,
+                      ca_error_t e)
 {
-    int64_t max_cert_ttl;
-    int64_t max_sign_ttl;
+    int64_t max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
+    int64_t max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
     uuid_t uuid_bin;
     uuidstr_t uuid;
     time_t now;
 
-    if (!ca || !cert || userid < 0) {
-        errno = EINVAL;
-        goto error;
-    }
-    max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
-    max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
-    if (ttl < 0 || ttl > max_cert_ttl) {
+    if (ttl > max_cert_ttl) {
         errno = EINVAL;
         ca_error (e, "ttl must be <= %lld", (long long)max_cert_ttl);
         goto error;
-    }
-    if (!ca->ca_cert) {
-        errno = EINVAL;
-        ca_error (e, "CA cert has not been loaded/generated");
-        return -1;
-    }
-    if (!sigcert_has_secret (ca->ca_cert)) {
-        errno = EINVAL;
-        ca_error (e, "CA cert does not contain secret key");
-        return -1;
     }
     if (ttl == 0)
         ttl = max_cert_ttl;
@@ -175,14 +160,33 @@ int ca_sign (const struct ca *ca, struct sigcert *cert,
         goto error;
     if (sigcert_meta_set (cert, "max-sign-ttl", SM_INT64, max_sign_ttl) < 0)
         goto error;
-    if (sigcert_sign_cert (ca->ca_cert, cert) < 0) {
-        ca_error (e, "sigcert_sign_cert: %s", strerror (errno));
-        return -1;
-    }
+    if (sigcert_sign_cert (ca_cert, cert) < 0)
+        goto error;
     return 0;
 error:
     ca_error (e, NULL);
     return -1;
+}
+
+int ca_sign (const struct ca *ca, struct sigcert *cert,
+             int64_t ttl, int64_t userid, ca_error_t e)
+{
+    if (!ca || !cert || ttl < 0 || userid < 0) {
+        errno = EINVAL;
+        ca_error (e, NULL);
+        return -1;
+    }
+    if (!ca->ca_cert) {
+        errno = EINVAL;
+        ca_error (e, "CA cert has not been loaded/generated");
+        return -1;
+    }
+    if (!sigcert_has_secret (ca->ca_cert)) {
+        errno = EINVAL;
+        ca_error (e, "CA cert does not contain secret key");
+        return -1;
+    }
+    return sign_with (ca, ca->ca_cert, cert, ttl, userid, e);
 }
 
 int ca_revoke (const struct ca *ca, const char *uuid, ca_error_t e)
@@ -308,6 +312,13 @@ int ca_keygen (struct ca *ca, ca_error_t e)
     }
     if (!(cert = sigcert_create ())) {
         ca_error (e, NULL);
+        return -1;
+    }
+    /* Self-sign the certificate, adding the same metadata
+     * we would add to a user certificate.
+     */
+    if (sign_with (ca, cert, cert, 0, getuid (), e) < 0) {
+        sigcert_destroy (cert);
         return -1;
     }
     sigcert_destroy (ca->ca_cert);
