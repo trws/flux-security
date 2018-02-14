@@ -87,6 +87,12 @@ int ca_store (const struct ca *ca, ca_error_t error);
  */
 int ca_load (struct ca *ca, bool secret, ca_error_t error);
 
+/* Accessors for the CA cert.
+ * (Mainly for test at this time).
+ */
+const struct sigcert *ca_get_cert (struct ca *ca, ca_error_t error);
+int ca_set_cert (struct ca *ca, const struct sigcert *cert, ca_error_t error);
+
 #endif // _UTIL_CA_H
 
 /*

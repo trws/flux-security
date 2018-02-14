@@ -418,6 +418,34 @@ int ca_load (struct ca *ca, bool secret, ca_error_t e)
     return 0;
 }
 
+const struct sigcert *ca_get_cert (struct ca *ca, ca_error_t e)
+{
+    if (!ca || !ca->ca_cert) {
+        errno = EINVAL;
+        ca_error (e, NULL);
+        return NULL;
+    }
+    return ca->ca_cert;
+}
+
+int ca_set_cert (struct ca *ca, const struct sigcert *ca_cert, ca_error_t e)
+{
+    struct sigcert *cpy;
+
+    if (!ca || !ca_cert) {
+        errno = EINVAL;
+        ca_error (e, NULL);
+        return -1;
+    }
+    if (!(cpy = sigcert_copy (ca_cert))) {
+        ca_error (e, NULL);
+        return -1;
+    }
+    sigcert_destroy (ca->ca_cert);
+    ca->ca_cert = cpy;
+    return 0;
+}
+
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
  */
