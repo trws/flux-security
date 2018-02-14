@@ -138,6 +138,7 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
     uuid_t uuid_bin;
     uuidstr_t uuid;
     time_t now;
+    const char *ca_uuid;
 
     if (ttl > max_cert_ttl) {
         errno = EINVAL;
@@ -159,6 +160,14 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
     if (sigcert_meta_set (cert, "userid", SM_INT64, userid) < 0)
         goto error;
     if (sigcert_meta_set (cert, "max-sign-ttl", SM_INT64, max_sign_ttl) < 0)
+        goto error;
+    if (ca_cert != cert) {
+        if (sigcert_meta_get (ca_cert, "uuid", SM_STRING, &ca_uuid) < 0)
+            goto error;
+    }
+    else
+        ca_uuid = uuid;
+    if (sigcert_meta_set (cert, "issuer", SM_STRING, ca_uuid) < 0)
         goto error;
     if (sigcert_sign_cert (ca_cert, cert) < 0)
         goto error;
