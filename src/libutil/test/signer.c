@@ -18,7 +18,8 @@ const char *ca_cf = \
 "max-sign-ttl = 30\n" \
 "cert-path = \"/tmp/test-ca-cert\"\n" \
 "revoke-dir = \"/tmp/test-ca-revoke\"\n" \
-"revoke-allow = true\n";
+"revoke-allow = true\n" \
+"domain = \"FLUX.TEST\"\n";
 
 /* Generate CA certificate in memory.
  */

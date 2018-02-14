@@ -55,6 +55,7 @@ static const struct cf_option ca_opts[] = {
     {"cert-path",       CF_STRING,   true},
     {"revoke-dir",      CF_STRING,   true},
     {"revoke-allow",    CF_BOOL,     true},
+    {"domain",          CF_STRING,   true},
     CF_OPTIONS_TABLE_END,
 };
 

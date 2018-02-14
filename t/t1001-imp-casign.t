@@ -33,6 +33,7 @@ new_ca_config() {
 	cert-path = "${SHARNESS_TRASH_DIRECTORY}/ca"
 	revoke-dir = "${SHARNESS_TRASH_DIRECTORY}/revoke.d"
 	revoke-allow = true
+	domain = "EXAMPLE.TEST"
 	EOT
 }
 

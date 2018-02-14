@@ -18,7 +18,8 @@ const char *conf_tmpl = \
 "max-sign-ttl = 30\n" \
 "cert-path = \"%s/ca-cert\"\n" \
 "revoke-dir = \"%s/ca-revoke\"\n" \
-"revoke-allow = true\n";
+"revoke-allow = true\n" \
+"domain = \"FLUX.TEST\"\n";
 
 static cf_t *cf;
 static char tmpdir[PATH_MAX + 1];
