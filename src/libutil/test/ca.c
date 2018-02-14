@@ -72,6 +72,10 @@ void test_basic (void)
     int64_t ttl;
     const char *uuid;
     char path[PATH_MAX + 1];
+    int64_t i;
+    const char *s;
+    time_t t, ctime, not_valid_before_time;
+    bool ca_capability;
 
     /* Create ca with cert in memory.
      */
@@ -83,7 +87,7 @@ void test_basic (void)
     errno = 0;
     ok (ca_load (ca, true, e) < 0 && errno == ENOENT && *e,
         "ca_load fails with ENOENT on nonexistent cert and sets e");
-    ok (ca_keygen (ca, e) == 0,
+    ok (ca_keygen (ca, 0, 0, e) == 0,
         "ca_keygen works");
 
     /* Create user cert
@@ -100,8 +104,35 @@ void test_basic (void)
 
     /* Sign cert with ca
      */
-    ok (ca_sign (ca, cert, 0, getuid (), e) == 0,
+    ok (ca_sign (ca, cert, 0, 0, getuid (), e) == 0,
         "ca_sign signed cert");
+
+    /* Check cert for required metadata added by CA
+     */
+    ok (sigcert_meta_get (cert, "uuid", SM_STRING, &s) == 0,
+        "cert has uuid metadata");
+    ok (sigcert_meta_get (cert, "issuer", SM_STRING, &s) == 0,
+        "cert has issuer metadata");
+    ok (sigcert_meta_get (cert, "ctime", SM_TIMESTAMP, &ctime) == 0,
+        "cert has ctime metadata");
+    ok (sigcert_meta_get (cert, "not-valid-before-time", SM_TIMESTAMP,
+                          &not_valid_before_time) == 0,
+        "cert has not-valid-before-time metadata");
+    ok (not_valid_before_time == ctime,
+        "not-valid-before-time == ctime"); // for now
+    ok (sigcert_meta_get (cert, "xtime", SM_TIMESTAMP, &t) == 0,
+        "cert has xtime metadata");
+    ok (sigcert_meta_get (cert, "domain", SM_STRING, &s) == 0,
+        "cert has domain metadata");
+    ok (sigcert_meta_get (cert, "userid", SM_INT64, &i) == 0,
+        "cert has userid metadata");
+    ok (sigcert_meta_get (cert, "max-sign-ttl", SM_INT64, &i) == 0,
+        "cert has max-sign-ttl metadata");
+    ok (sigcert_meta_get (cert, "ca-capability", SM_BOOL,
+                          &ca_capability) == 0,
+        "cert has ca_capability metadata");
+    ok (ca_capability == false,
+        "ca-capability is false");
 
     /* Verify cert with ca
      */
@@ -123,7 +154,7 @@ void test_basic (void)
     ok (ca_verify (ca, cert, NULL, NULL, e) == 0,
         "ca_verify still works");
     errno = 0;
-    ok (ca_sign (ca, cert, 0, getuid (), e) < 0 && errno == EINVAL,
+    ok (ca_sign (ca, cert, 0, 0, getuid (), e) < 0 && errno == EINVAL,
         "ca_sign fails without secret key");
     diag ("%s", e);
     ok (ca_load (ca, true, e) == 0,
@@ -166,6 +197,132 @@ void test_basic (void)
     ca_destroy (ca);
 }
 
+void test_ca_meta (void)
+{
+    ca_error_t e;
+    struct ca *ca;
+    const struct sigcert *ca_cert;
+    const char *s;
+    const char *uuid, *issuer;
+    time_t t, ctime, not_valid_before_time;
+    int64_t i;
+    bool ca_capability;
+
+    if (!(ca = ca_create (cf, e)))
+        BAIL_OUT ("ca_create: %s", e);
+    if (ca_keygen (ca, 0, 0, e) < 0)
+        BAIL_OUT ("ca_keygen: %s", e);
+    ca_cert = ca_get_cert (ca, e);
+    ok (ca_cert != NULL,
+        "ca_get_cert works");
+    if (!ca_cert)
+        BAIL_OUT ("ca_get_cert: %s", e);
+
+    ok (sigcert_meta_get (ca_cert, "uuid", SM_STRING, &uuid) == 0,
+        "ca cert has uuid metadata");
+    ok (sigcert_meta_get (ca_cert, "issuer", SM_STRING, &issuer) == 0,
+        "ca cert has issuer metadata");
+    ok (!strcmp (uuid, issuer),
+        "ca issuer and uuid are the same (self-signed)");
+    ok (sigcert_meta_get (ca_cert, "ctime", SM_TIMESTAMP, &ctime) == 0,
+        "ca cert has ctime metadata");
+    ok (sigcert_meta_get (ca_cert, "not-valid-before-time", SM_TIMESTAMP,
+                          &not_valid_before_time) == 0,
+        "ca cert has not-valid-before-time metadata");
+    ok (not_valid_before_time == ctime,
+        "not-valid-before-time == ctime"); // for now
+    ok (sigcert_meta_get (ca_cert, "xtime", SM_TIMESTAMP, &t) == 0,
+        "ca cert has xtime metadata");
+    ok (sigcert_meta_get (ca_cert, "domain", SM_STRING, &s) == 0,
+        "ca cert has domain metadata");
+    ok (sigcert_meta_get (ca_cert, "userid", SM_INT64, &i) == 0,
+        "ca cert has userid metadata");
+    ok (sigcert_meta_get (ca_cert, "max-sign-ttl", SM_INT64, &i) == 0,
+        "ca cert has max-sign-ttl metadata");
+    ok (sigcert_meta_get (ca_cert, "ca-capability", SM_BOOL,
+                          &ca_capability) ==0,
+        "ca cert has ca-capability metadata");
+    ok (ca_capability == true,
+        "ca-capability is true");
+
+    ok (ca_verify (ca, ca_cert, NULL, NULL, e) == 0,
+        "ca_verify works on self-signed CA cert");
+
+    ca_destroy (ca);
+}
+
+/* Try to sign a cert with a cert that has no ca-capability.
+ */
+void test_ca_capability (void)
+{
+    ca_error_t e;
+    struct ca *ca;
+    struct sigcert *cert, *ca_cert;
+
+    if (!(ca = ca_create (cf, NULL)))
+        BAIL_OUT ("ca_create failed");
+    if (!(cert = sigcert_create ()))
+        BAIL_OUT ("sigcert_create failed");
+    if (!(ca_cert = sigcert_create ()))
+        BAIL_OUT ("sigcert_create failed");
+    if (sigcert_meta_set (ca_cert, "uuid", SM_STRING, "foo") < 0)
+        BAIL_OUT ("sigcert_meta_set failed");
+    ok (ca_set_cert (ca, ca_cert, e) == 0,
+        "ca_set_cert set cert with ca-capability=false");
+    ok (ca_sign (ca, cert, 0, 0, getuid (), e) == 0,
+        "ca_sign works with incapable CA cert");
+    errno = 0;
+    *e = '\0';
+    ok (ca_verify (ca, cert, NULL, NULL, e) < 0 && errno == EINVAL && *e,
+        "but ca_verify fails with EINVAL and updates e");
+    diag ("ca_verify: %s", e);
+
+    ca_destroy (ca);
+    sigcert_destroy (cert);
+    sigcert_destroy (ca_cert);
+}
+
+/* Manipulate ttl and not_valid_before_time in cert to
+ * exercise cert expiration error paths.
+ */
+void test_expiration (void)
+{
+    ca_error_t e;
+    struct ca *ca;
+    struct sigcert *cert;
+    time_t now;
+
+    if (!(ca = ca_create (cf, NULL)))
+        BAIL_OUT ("ca_create failed");
+    if (ca_keygen (ca, 0, 0, e) < 0)
+        BAIL_OUT ("ca_keygen failed");
+    if (!(cert = sigcert_create ()))
+        BAIL_OUT ("sigcert_create failed");
+    if ((now = time (NULL)) == (time_t)-1)
+        BAIL_OUT ("time(2) failed");
+
+    /* xtime is past
+     */
+    ok (ca_sign (ca, cert, now - 5, 1, getuid (), e) == 0,
+        "ca_sign works with xtime past");
+    errno = 0;
+    *e = '\0';
+    ok (ca_verify (ca, cert, NULL, NULL, e) < 0 && errno == EINVAL && *e,
+        "but ca_verify fails with EINVAL and updates e");
+
+    /* not_valid_before_time is future
+     */
+    ok (ca_sign (ca, cert, now + 5, 1, getuid (), e) == 0,
+        "ca_sign works with not_valid_before_time future");
+    errno = 0;
+    *e = '\0';
+    ok (ca_verify (ca, cert, NULL, NULL, e) < 0 && errno == EINVAL && *e,
+        "but ca_verify fails with EINVAL and updates e");
+
+    ca_destroy (ca);
+    sigcert_destroy (cert);
+}
+
 void test_corner (void)
 {
     ca_error_t e;
@@ -176,7 +333,7 @@ void test_corner (void)
 
     if (!(ca = ca_create (cf, NULL)))
         BAIL_OUT ("ca_create failed");
-    if (ca_keygen (ca, e) < 0)
+    if (ca_keygen (ca, 0, 0, e) < 0)
         BAIL_OUT ("ca_keygen failed");
     if (!(badcf = cf_create ()))
         BAIL_OUT ("cf_create failed");
@@ -184,7 +341,7 @@ void test_corner (void)
         BAIL_OUT ("cf_update failed");
     if (!(cert = sigcert_create ()))
         BAIL_OUT ("sigcert_create failed");
-    if (ca_sign (ca, cert, 30, getuid (), e) < 0)
+    if (ca_sign (ca, cert, 0, 30, getuid (), e) < 0)
         BAIL_OUT ("ca_sign failed");
     if (!(canokey = ca_create (cf, NULL)))
         BAIL_OUT ("ca_create nokey failed");
@@ -203,24 +360,32 @@ void test_corner (void)
 
     errno = 0;
     *e = '\0';
-    ok (ca_sign (NULL, cert, 2, getuid (), e) < 0 && errno == EINVAL && *e,
+    ok (ca_sign (NULL, cert, 0, 2, getuid (), e) < 0 && errno == EINVAL && *e,
         "ca_sign ca=NULL fails with EINVAL and updates e");
     errno = 0;
     *e = '\0';
-    ok (ca_sign (ca, NULL, 2, getuid (), e) < 0 && errno == EINVAL && *e,
+    ok (ca_sign (ca, NULL, 0, 2, getuid (), e) < 0 && errno == EINVAL && *e,
         "ca_sign cert=NULL fails with EINVAL and updates e");
     errno = 0;
     *e = '\0';
-    ok (ca_sign (ca, cert, -1, getuid (), e) < 0 && errno == EINVAL && *e,
+    ok (ca_sign (ca, cert, 0, -1, getuid (), e) < 0 && errno == EINVAL && *e,
         "ca_sign ttl=-1 fails with EINVAL and updates e");
     errno = 0;
     *e = '\0';
-    ok (ca_sign (ca, cert, 2, -1, e) < 0 && errno == EINVAL && *e,
+    ok (ca_sign (ca, cert, 0, 61, getuid (), e) < 0 && errno == EINVAL && *e,
+        "ca_sign ttl=toobig fails with EINVAL and updates e");
+    errno = 0;
+    *e = '\0';
+    ok (ca_sign (ca, cert, 0, 2, -1, e) < 0 && errno == EINVAL && *e,
         "ca_sign userid=-1 fails with EINVAL and updates e");
     errno = 0;
     *e = '\0';
-    ok (ca_sign (canokey, cert, 2, getuid (), e) < 0 && errno == EINVAL && *e,
+    ok (ca_sign (canokey, cert, 0, 2, getuid (), e) < 0 && errno == EINVAL && *e,
         "ca_sign ca=(nokeys) fails with EINVAL and updates e");
+    ok (ca_sign (ca, cert, -1, 2, getuid (), e) < 0 && errno == EINVAL && *e,
+        "ca_sign not_valid_before_time=-1 fails with EINVAL and updates e");
+    errno = 0;
+    *e = '\0';
 
     ok (ca_verify (ca, cert, NULL, NULL, NULL) == 0,
         "test cert sig is still valid");
@@ -240,8 +405,12 @@ void test_corner (void)
 
     errno = 0;
     *e = '\0';
-    ok (ca_keygen (NULL, e) < 0 && errno == EINVAL && *e,
+    ok (ca_keygen (NULL, 0, 0, e) < 0 && errno == EINVAL && *e,
         "ca_keygen ca=NULL fails with EINVAL and updates e");
+    errno = 0;
+    *e = '\0';
+    ok (ca_keygen (ca, -1, 0, e) < 0 && errno == EINVAL && *e,
+        "ca_keygen not_valid_before_time=-1 fails with EINVAL and updates e");
 
     errno = 0;
     *e = '\0';
@@ -269,6 +438,21 @@ void test_corner (void)
     ok (ca_revoke (ca, "", e) < 0 && errno == EINVAL && *e,
         "ca_revoke uuid=(empty) fails with EINVAL and updates e");
 
+    errno = 0;
+    *e = '\0';
+    ok (ca_get_cert (NULL, e) == NULL && errno == EINVAL && *e,
+        "ca_get_cert ca=NULL fails with EINVAL and updates e");
+
+    errno = 0;
+    *e = '\0';
+    ok (ca_set_cert (NULL, cert, e) == -1 && errno == EINVAL && *e,
+        "ca_set_cert ca=NULL fails with EINVAL and updates e");
+
+    errno = 0;
+    *e = '\0';
+    ok (ca_set_cert (ca, NULL, e) == -1 && errno == EINVAL && *e,
+        "ca_set_cert cert=NULL fails with EINVAL and updates e");
+
     sigcert_destroy (cert);
     cf_destroy (badcf);
     ca_destroy (ca);
@@ -282,6 +466,9 @@ int main (int argc, char *argv[])
     cf_init ();
 
     test_basic ();
+    test_ca_meta ();
+    test_ca_capability ();
+    test_expiration ();
     test_corner ();
 
     cf_fini ();
