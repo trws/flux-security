@@ -136,6 +136,7 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
 {
     int64_t max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
     int64_t max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
+    const char *domain = cf_string (cf_get_in (ca->cf, "domain"));
     uuid_t uuid_bin;
     uuidstr_t uuid;
     time_t now;
@@ -169,6 +170,8 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
     else
         ca_uuid = uuid;
     if (sigcert_meta_set (cert, "issuer", SM_STRING, ca_uuid) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "domain", SM_STRING, domain) < 0)
         goto error;
     if (sigcert_sign_cert (ca_cert, cert) < 0)
         goto error;
