@@ -65,6 +65,10 @@ int toml_utf8_to_ucs(const char* orig, int len, int64_t* ret)
 	v = i;
 	return *ret = v, 1;
     }
+#if 0
+/* FIXME: multibyte not working
+ * https://github.com/cktan/tomlc99/issues/7
+ */
     /* 0x00000080 - 0x000007FF:
        110xxxxx 10xxxxxx
     */
@@ -132,6 +136,7 @@ int toml_utf8_to_ucs(const char* orig, int len, int64_t* ret)
 	}
 	return *ret = v, (const char*) buf - orig;
     }
+#endif
     return -1;
 }
 
