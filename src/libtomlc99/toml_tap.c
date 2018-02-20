@@ -292,6 +292,30 @@ void parse_good_input (void)
     }
 }
 
+/* Recreate the TOML input from the tomlc99/test/extra directory.
+ */
+void parse_extra (void)
+{
+    const char *good[] = {
+        "x = [ {'a'= 1}, {'a'= 2} ]",   // array_of_tables.toml
+        "x = [1,2,3]",                  // inline_array.toml
+        "x = {'a'= 1, 'b'= 2 }",        // inline_table.toml
+        NULL,
+    };
+    int i;
+
+    for (i = 0; good[i] != NULL; i++) {
+        char e[200];
+        toml_table_t *conf = toml_parse ((char *)good[i], e, sizeof (e));
+        ok (conf != NULL,
+            "parsed extra %d: \"%s\"", i, good[i]);
+        if (!conf)
+            diag ("%s", e);
+        toml_free (conf);
+    }
+
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -300,6 +324,8 @@ int main (int argc, char *argv[])
 
     parse_good_input ();
     parse_bad_input ();
+
+    parse_extra ();
 
     done_testing ();
 }
