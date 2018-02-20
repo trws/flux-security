@@ -15,7 +15,7 @@ libtomlc99_la_SOURCES = \
 	toml.c \
 	toml.h
 
-TESTS = toml_tap.t
+TESTS = test_toml.t
 
 check_PROGRAMS = \
 	toml_cat \
@@ -43,9 +43,9 @@ toml_json_SOURCES = toml_json.c
 toml_json_LDADD = $(test_ldadd)
 toml_json_CPPFLAGS = $(test_cppflags)
 
-toml_tap_t_SOURCES = toml_tap.c
-toml_tap_t_LDADD = $(test_ldadd)
-toml_tap_t_CPPFLAGS = $(test_cppflags)
+test_toml_t_SOURCES = test/toml.c
+test_toml_t_LDADD = $(test_ldadd)
+test_toml_t_CPPFLAGS = $(test_cppflags)
 
 EXTRA_DIST = \
 	BurntSushi_input/invalid/array-mixed-types-arrays-and-ints.toml \
