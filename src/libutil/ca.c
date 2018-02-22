@@ -132,7 +132,7 @@ void ca_destroy (struct ca *ca)
 
 static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
                       struct sigcert *cert, int64_t ttl, int64_t userid,
-                      ca_error_t e)
+                      bool ca_capability, ca_error_t e)
 {
     int64_t max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
     int64_t max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
@@ -169,11 +169,14 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
         if (sigcert_meta_get (ca_cert, "uuid", SM_STRING, &ca_uuid) < 0)
             goto error;
     }
-    else
+    else { // self-signed
         ca_uuid = uuid;
+    }
     if (sigcert_meta_set (cert, "issuer", SM_STRING, ca_uuid) < 0)
         goto error;
     if (sigcert_meta_set (cert, "domain", SM_STRING, domain) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "ca-capability", SM_BOOL, ca_capability) < 0)
         goto error;
     if (sigcert_sign_cert (ca_cert, cert) < 0)
         goto error;
@@ -201,7 +204,7 @@ int ca_sign (const struct ca *ca, struct sigcert *cert,
         ca_error (e, "CA cert does not contain secret key");
         return -1;
     }
-    return sign_with (ca, ca->ca_cert, cert, ttl, userid, e);
+    return sign_with (ca, ca->ca_cert, cert, ttl, userid, false, e);
 }
 
 int ca_revoke (const struct ca *ca, const char *uuid, ca_error_t e)
@@ -269,6 +272,7 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     time_t not_valid_before_time;
     time_t now;
     const char *uuid;
+    bool ca_capability;
 
     if (!ca || !cert) {
         errno = EINVAL;
@@ -277,6 +281,12 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     if (!ca->ca_cert) {
         ca_error (e, "CA cert has not been loaded/generated");
         errno = EINVAL;
+        return -1;
+    }
+    if (sigcert_meta_get (ca->ca_cert, "ca-capability", SM_BOOL,
+                          &ca_capability) < 0 || ca_capability == false) {
+        errno = EINVAL;
+        ca_error (e, "ca certificate lacks ca-capability");
         return -1;
     }
     if (time (&now) == (time_t)-1)
@@ -339,9 +349,10 @@ int ca_keygen (struct ca *ca, ca_error_t e)
         return -1;
     }
     /* Self-sign the certificate, adding the same metadata
-     * we would add to a user certificate.
+     * we would add to a user certificate, except that
+     * ca-capability = true.
      */
-    if (sign_with (ca, cert, cert, 0, getuid (), e) < 0) {
+    if (sign_with (ca, cert, cert, 0, getuid (), true, e) < 0) {
         sigcert_destroy (cert);
         return -1;
     }
