@@ -155,6 +155,8 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
     uuid_unparse (uuid_bin, uuid);
     if (sigcert_meta_set (cert, "uuid", SM_STRING, uuid) < 0)
         goto error;
+    if (sigcert_meta_set (cert, "not-valid-before-time", SM_TIMESTAMP, now) < 0)
+        goto error;
     if (sigcert_meta_set (cert, "ctime", SM_TIMESTAMP, now) < 0)
         goto error;
     if (sigcert_meta_set (cert, "xtime", SM_TIMESTAMP, now + ttl) < 0)
@@ -264,6 +266,7 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     int64_t userid;
     time_t ctime;
     time_t xtime;
+    time_t not_valid_before_time;
     time_t now;
     const char *uuid;
 
@@ -285,6 +288,9 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     }
     if (sigcert_meta_get (cert, "uuid", SM_STRING, &uuid) < 0)
         goto error_cert;
+    if (sigcert_meta_get (cert, "not-valid-before-time", SM_TIMESTAMP,
+                          &not_valid_before_time) < 0)
+        goto error_cert;
     if (sigcert_meta_get (cert, "ctime", SM_TIMESTAMP, &ctime) < 0)
         goto error_cert;
     if (sigcert_meta_get (cert, "xtime", SM_TIMESTAMP, &xtime) < 0)
@@ -295,6 +301,11 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
         goto error_cert;
     if (xtime < now) {
         ca_error (e, "cert has expired");
+        errno = EINVAL;
+        return -1;
+    }
+    if (not_valid_before_time > now) {
+        ca_error (e, "cert is not yet valid");
         errno = EINVAL;
         return -1;
     }
