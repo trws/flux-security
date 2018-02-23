@@ -37,7 +37,7 @@ struct ca *create_ca (void)
 
     if (!(ca = ca_create (cf, e)))
         BAIL_OUT ("ca_create failed: %s", e);
-    if (ca_keygen (ca, e) < 0)
+    if (ca_keygen (ca, 0, e) < 0)
         BAIL_OUT ("ca_keygen failed: %s", e);
     cf_destroy (cf);
 

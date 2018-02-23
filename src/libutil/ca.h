@@ -70,7 +70,7 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
  * Return 0 on success, -1 on failure with errno set.
  * On failure, if 'error' is non-NULL, it will contain a textual error message.
  */
-int ca_keygen (struct ca *ca, ca_error_t error);
+int ca_keygen (struct ca *ca, int64_t ttl, ca_error_t error);
 
 /* Store CA cert to configured path.
  * Return 0 on success, -1 on failure with errno set.
