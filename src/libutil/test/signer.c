@@ -18,7 +18,8 @@ const char *ca_cf = \
 "max-sign-ttl = 30\n" \
 "cert-path = \"/tmp/test-ca-cert\"\n" \
 "revoke-dir = \"/tmp/test-ca-revoke\"\n" \
-"revoke-allow = true\n";
+"revoke-allow = true\n" \
+"domain = \"FLUX.TEST\"\n";
 
 /* Generate CA certificate in memory.
  */
@@ -36,7 +37,7 @@ struct ca *create_ca (void)
 
     if (!(ca = ca_create (cf, e)))
         BAIL_OUT ("ca_create failed: %s", e);
-    if (ca_keygen (ca, e) < 0)
+    if (ca_keygen (ca, 0, 0, e) < 0)
         BAIL_OUT ("ca_keygen failed: %s", e);
     cf_destroy (cf);
 
@@ -59,7 +60,7 @@ struct sigcert *create_cert (struct ca *ca, int64_t userid, int64_t ttl)
 
     if (!(cert = sigcert_create ()))
         BAIL_OUT ("sigcert_create failed");
-    if (ca_sign (ca, cert, ttl, userid, e) < 0)
+    if (ca_sign (ca, cert, 0, ttl, userid, e) < 0)
         BAIL_OUT ("ca_sign: %s", e);
     return cert;
 }

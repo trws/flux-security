@@ -35,6 +35,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <uuid.h>
+#include <assert.h>
 
 #include "ca.h"
 #include "cf.h"
@@ -54,6 +55,7 @@ static const struct cf_option ca_opts[] = {
     {"cert-path",       CF_STRING,   true},
     {"revoke-dir",      CF_STRING,   true},
     {"revoke-allow",    CF_BOOL,     true},
+    {"domain",          CF_STRING,   true},
     CF_OPTIONS_TABLE_END,
 };
 
@@ -128,26 +130,76 @@ void ca_destroy (struct ca *ca)
     }
 }
 
-
-int ca_sign (const struct ca *ca, struct sigcert *cert,
-             int64_t ttl, int64_t userid, ca_error_t e)
+static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
+                      struct sigcert *cert, time_t not_valid_before_time,
+                      int64_t ttl, int64_t userid,
+                      bool ca_capability, ca_error_t e)
 {
-    int64_t max_cert_ttl;
-    int64_t max_sign_ttl;
+    int64_t max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
+    int64_t max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
+    const char *domain = cf_string (cf_get_in (ca->cf, "domain"));
     uuid_t uuid_bin;
     uuidstr_t uuid;
     time_t now;
+    const char *ca_uuid;
 
-    if (!ca || !cert || userid < 0) {
-        errno = EINVAL;
-        goto error;
-    }
-    max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
-    max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
-    if (ttl < 0 || ttl > max_cert_ttl) {
+    if (ttl > max_cert_ttl) {
         errno = EINVAL;
         ca_error (e, "ttl must be <= %lld", (long long)max_cert_ttl);
         goto error;
+    }
+    if (ttl == 0)
+        ttl = max_cert_ttl;
+    if (time (&now) == (time_t)-1)
+        goto error;
+    if (not_valid_before_time == 0)
+        not_valid_before_time = now;
+
+    uuid_generate (uuid_bin);
+    uuid_unparse (uuid_bin, uuid);
+    if (sigcert_meta_set (cert, "uuid", SM_STRING, uuid) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "not-valid-before-time", SM_TIMESTAMP,
+                          not_valid_before_time) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "ctime", SM_TIMESTAMP, now) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "xtime", SM_TIMESTAMP,
+                          not_valid_before_time + ttl) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "userid", SM_INT64, userid) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "max-sign-ttl", SM_INT64, max_sign_ttl) < 0)
+        goto error;
+    if (ca_cert != cert) {
+        if (sigcert_meta_get (ca_cert, "uuid", SM_STRING, &ca_uuid) < 0)
+            goto error;
+    }
+    else { // self-signed
+        ca_uuid = uuid;
+    }
+    if (sigcert_meta_set (cert, "issuer", SM_STRING, ca_uuid) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "domain", SM_STRING, domain) < 0)
+        goto error;
+    if (sigcert_meta_set (cert, "ca-capability", SM_BOOL, ca_capability) < 0)
+        goto error;
+    if (sigcert_sign_cert (ca_cert, cert) < 0)
+        goto error;
+    return 0;
+error:
+    ca_error (e, NULL);
+    return -1;
+}
+
+int ca_sign (const struct ca *ca, struct sigcert *cert,
+             time_t not_valid_before_time, int64_t ttl,
+             int64_t userid, ca_error_t e)
+{
+    if (!ca || !cert || ttl < 0 || not_valid_before_time < 0 || userid < 0) {
+        errno = EINVAL;
+        ca_error (e, NULL);
+        return -1;
     }
     if (!ca->ca_cert) {
         errno = EINVAL;
@@ -159,30 +211,8 @@ int ca_sign (const struct ca *ca, struct sigcert *cert,
         ca_error (e, "CA cert does not contain secret key");
         return -1;
     }
-    if (ttl == 0)
-        ttl = max_cert_ttl;
-    if (time (&now) == (time_t)-1)
-        goto error;
-    uuid_generate (uuid_bin);
-    uuid_unparse (uuid_bin, uuid);
-    if (sigcert_meta_set (cert, "uuid", SM_STRING, uuid) < 0)
-        goto error;
-    if (sigcert_meta_set (cert, "ctime", SM_TIMESTAMP, now) < 0)
-        goto error;
-    if (sigcert_meta_set (cert, "xtime", SM_TIMESTAMP, now + ttl) < 0)
-        goto error;
-    if (sigcert_meta_set (cert, "userid", SM_INT64, userid) < 0)
-        goto error;
-    if (sigcert_meta_set (cert, "max-sign-ttl", SM_INT64, max_sign_ttl) < 0)
-        goto error;
-    if (sigcert_sign_cert (ca->ca_cert, cert) < 0) {
-        ca_error (e, "sigcert_sign_cert: %s", strerror (errno));
-        return -1;
-    }
-    return 0;
-error:
-    ca_error (e, NULL);
-    return -1;
+    return sign_with (ca, ca->ca_cert, cert, not_valid_before_time, ttl,
+                      userid, false, e);
 }
 
 int ca_revoke (const struct ca *ca, const char *uuid, ca_error_t e)
@@ -247,8 +277,10 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     int64_t userid;
     time_t ctime;
     time_t xtime;
+    time_t not_valid_before_time;
     time_t now;
     const char *uuid;
+    bool ca_capability;
 
     if (!ca || !cert) {
         errno = EINVAL;
@@ -257,6 +289,12 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     if (!ca->ca_cert) {
         ca_error (e, "CA cert has not been loaded/generated");
         errno = EINVAL;
+        return -1;
+    }
+    if (sigcert_meta_get (ca->ca_cert, "ca-capability", SM_BOOL,
+                          &ca_capability) < 0 || ca_capability == false) {
+        errno = EINVAL;
+        ca_error (e, "ca certificate lacks ca-capability");
         return -1;
     }
     if (time (&now) == (time_t)-1)
@@ -268,6 +306,9 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
     }
     if (sigcert_meta_get (cert, "uuid", SM_STRING, &uuid) < 0)
         goto error_cert;
+    if (sigcert_meta_get (cert, "not-valid-before-time", SM_TIMESTAMP,
+                          &not_valid_before_time) < 0)
+        goto error_cert;
     if (sigcert_meta_get (cert, "ctime", SM_TIMESTAMP, &ctime) < 0)
         goto error_cert;
     if (sigcert_meta_get (cert, "xtime", SM_TIMESTAMP, &xtime) < 0)
@@ -278,6 +319,11 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
         goto error_cert;
     if (xtime < now) {
         ca_error (e, "cert has expired");
+        errno = EINVAL;
+        return -1;
+    }
+    if (not_valid_before_time > now) {
+        ca_error (e, "cert is not yet valid");
         errno = EINVAL;
         return -1;
     }
@@ -297,17 +343,27 @@ error:
     return -1;
 }
 
-int ca_keygen (struct ca *ca, ca_error_t e)
+int ca_keygen (struct ca *ca, time_t not_valid_before_time,
+               int64_t ttl, ca_error_t e)
 {
     struct sigcert *cert = NULL;
 
-    if (!ca) {
+    if (!ca || ttl < 0 || not_valid_before_time < 0) {
         errno = EINVAL;
         ca_error (e, NULL);
         return -1;
     }
     if (!(cert = sigcert_create ())) {
         ca_error (e, NULL);
+        return -1;
+    }
+    /* Self-sign the certificate, adding the same metadata
+     * we would add to a user certificate, except that
+     * ca-capability = true.
+     */
+    if (sign_with (ca, cert, cert, not_valid_before_time, ttl,
+                   getuid (), true, e) < 0) {
+        sigcert_destroy (cert);
         return -1;
     }
     sigcert_destroy (ca->ca_cert);
@@ -359,6 +415,34 @@ int ca_load (struct ca *ca, bool secret, ca_error_t e)
     }
     sigcert_destroy (ca->ca_cert);
     ca->ca_cert = cert;
+    return 0;
+}
+
+const struct sigcert *ca_get_cert (struct ca *ca, ca_error_t e)
+{
+    if (!ca || !ca->ca_cert) {
+        errno = EINVAL;
+        ca_error (e, NULL);
+        return NULL;
+    }
+    return ca->ca_cert;
+}
+
+int ca_set_cert (struct ca *ca, const struct sigcert *ca_cert, ca_error_t e)
+{
+    struct sigcert *cpy;
+
+    if (!ca || !ca_cert) {
+        errno = EINVAL;
+        ca_error (e, NULL);
+        return -1;
+    }
+    if (!(cpy = sigcert_copy (ca_cert))) {
+        ca_error (e, NULL);
+        return -1;
+    }
+    sigcert_destroy (ca->ca_cert);
+    ca->ca_cert = cpy;
     return 0;
 }
 

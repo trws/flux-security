@@ -74,6 +74,13 @@ void test_meta (void)
     cert = sigcert_create ();
     ok (cert != NULL,
         "sigcert_create works");
+
+    /* Check hardwired metadata
+     */
+    ok (sigcert_meta_get (cert, "algorithm", SM_STRING, &s) == 0
+       && !strcmp (s, "ed25519"),
+       "algorithm=ed25519 is set");
+
     ok (sigcert_meta_set (cert, "foo", SM_STRING, "bar") == 0,
         "sigcert_meta_set foo=bar");
     ok (sigcert_meta_set (cert, "baz", SM_INT64, 42LL) == 0,

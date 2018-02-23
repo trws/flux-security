@@ -1,6 +1,8 @@
 #ifndef _UTIL_CA_H
 #define _UTIL_CA_H
 
+#include <time.h>
+
 #include "sigcert.h"
 #include "cf.h"
 
@@ -35,13 +37,15 @@ void ca_destroy (struct ca *ca);
 
 /* Add/update CA-required metadata to 'cert', then sign it.
  * This function fails if the CA secret key has not been loaded with ca_load
- * or ca_keygen.  'ttl' (seconds) must not exceed 'max-cert-ttl' (0 = maximum).
+ * or ca_keygen.  'not_valid_before_time' can be a UTC wallclock time_t, or
+ * 0=now. 'ttl' (seconds) must not exceed 'max-cert-ttl' (0 = maximum).
  * 'userid' should be authenticated to match the requesting user (the owner
  * of the certificate). Return 0 on success, -1 on failure with errno set.
  * On failure, if 'error' is non-NULL, it will contain a textual error message.
  */
 int ca_sign (const struct ca *ca, struct sigcert *cert,
-             int64_t ttl, int64_t userid, ca_error_t error);
+             time_t not_valid_before_time, int64_t ttl,
+             int64_t userid, ca_error_t error);
 
 /* Add cert identified by 'uuid' to the revocation list.
  * This creates an empty file named 'uuid' in 'revoke-dir'.
@@ -66,7 +70,8 @@ int ca_verify (const struct ca *ca, const struct sigcert *cert,
  * Return 0 on success, -1 on failure with errno set.
  * On failure, if 'error' is non-NULL, it will contain a textual error message.
  */
-int ca_keygen (struct ca *ca, ca_error_t error);
+int ca_keygen (struct ca *ca, time_t not_valid_before_time,
+               int64_t ttl, ca_error_t error);
 
 /* Store CA cert to configured path.
  * Return 0 on success, -1 on failure with errno set.
@@ -81,6 +86,12 @@ int ca_store (const struct ca *ca, ca_error_t error);
  * On failure, if 'error' is non-NULL, it will contain a textual error message.
  */
 int ca_load (struct ca *ca, bool secret, ca_error_t error);
+
+/* Accessors for the CA cert.
+ * (Mainly for test at this time).
+ */
+const struct sigcert *ca_get_cert (struct ca *ca, ca_error_t error);
+int ca_set_cert (struct ca *ca, const struct sigcert *cert, ca_error_t error);
 
 #endif // _UTIL_CA_H
 
