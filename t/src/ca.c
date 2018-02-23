@@ -82,7 +82,7 @@ static void keygen (void)
     struct ca *ca = init_ca ();
     ca_error_t error;
 
-    if (ca_keygen (ca, 0, error) < 0)
+    if (ca_keygen (ca, 0, 0, error) < 0)
         die ("ca_keygen: %s", error);
     if (ca_store (ca, error) < 0)
         die ("ca_store: %s", error);

@@ -343,11 +343,12 @@ error:
     return -1;
 }
 
-int ca_keygen (struct ca *ca, int64_t ttl, ca_error_t e)
+int ca_keygen (struct ca *ca, time_t not_valid_before_time,
+               int64_t ttl, ca_error_t e)
 {
     struct sigcert *cert = NULL;
 
-    if (!ca || ttl < 0) {
+    if (!ca || ttl < 0 || not_valid_before_time < 0) {
         errno = EINVAL;
         ca_error (e, NULL);
         return -1;
@@ -360,7 +361,8 @@ int ca_keygen (struct ca *ca, int64_t ttl, ca_error_t e)
      * we would add to a user certificate, except that
      * ca-capability = true.
      */
-    if (sign_with (ca, cert, cert, 0, ttl, getuid (), true, e) < 0) {
+    if (sign_with (ca, cert, cert, not_valid_before_time, ttl,
+                   getuid (), true, e) < 0) {
         sigcert_destroy (cert);
         return -1;
     }
