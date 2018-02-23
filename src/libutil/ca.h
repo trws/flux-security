@@ -22,23 +22,6 @@
  *
  * Cert revocation consists of placing the uuid of a cert in a directory
  * that is propagated along with the CA public key.
- *
- * TOML Configuration:
- *
- * [ca]
- * max-sign-ttl = 3600                         # max TTL (sec) for signing
- * max-cert-ttl = 3600                         # max TTL (sec) for certificate
- * cert-path = "/etc/flux-security/ca/cert"    # path to CA certificates
- * revoke-dir = "/etc/flux-security/ca/revoke" # path to revocation directory
- * revoke-allow = false                        # ca_revoke allowed here?
- *
- * CA-required metadata for signed public certs:
- *
- * uuid - unique id for cert, a key for revocation
- * ctime - create time (timestamp for cert signature)
- * xtime - expiration time (ctime + TTL)
- * max-sign-ttl - max TTL (seconds) for signatures
- * userid - owner of the cert, authenticated by CA
  */
 
 typedef char ca_error_t[200];

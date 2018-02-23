@@ -366,7 +366,7 @@ void check_ucs_to_utf8 (void)
         "ucs_to_utf8: 0x10000 converted to 4-char UTF8");
     ok (toml_ucs_to_utf8 (0x1fffff, buf) == 4
         && !memcmp (buf, "\xf7\xbf\xbf\xbf", 4),
-        "ucs_to_utf8: 0x1ffff converted to 4-char UTF8");
+        "ucs_to_utf8: 0x1fffff converted to 4-char UTF8");
 
     ok (toml_ucs_to_utf8 (0x200000, buf) == 5
         && !memcmp (buf, "\xf8\x88\x80\x80\x80", 5),
@@ -408,8 +408,8 @@ void check_utf8_to_ucs (void)
 
     ok (toml_utf8_to_ucs ("\xf0\x90\x80\x80", 4, &code) == 4 && code == 0x10000,
         "utf8_to_ucs: 0x10000 converted from 4-char UTF8");
-    ok (toml_utf8_to_ucs ("\xf0\x90\x80\x80", 4, &code) == 4 && code == 0x10000,
-        "utf8_to_ucs: 0x10000 converted from 4-char UTF8");
+    ok (toml_utf8_to_ucs ("\xf7\xbf\xbf\xbf", 4, &code) == 4 && code == 0x1fffff,
+        "utf8_to_ucs: 0x1fffff converted from 4-char UTF8");
 
     ok (toml_utf8_to_ucs ("\xf8\x88\x80\x80\x80", 5, &code) == 5 && code == 0x200000,
         "utf8_to_ucs: 0x200000 converted from 5-char UTF8");
