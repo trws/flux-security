@@ -60,7 +60,7 @@ struct sigcert *create_cert (struct ca *ca, int64_t userid, int64_t ttl)
 
     if (!(cert = sigcert_create ()))
         BAIL_OUT ("sigcert_create failed");
-    if (ca_sign (ca, cert, ttl, userid, e) < 0)
+    if (ca_sign (ca, cert, 0, ttl, userid, e) < 0)
         BAIL_OUT ("ca_sign: %s", e);
     return cert;
 }

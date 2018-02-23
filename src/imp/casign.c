@@ -104,7 +104,7 @@ static void sign_cert (cf_t *conf, struct sigcert *cert)
         imp_die (1, "casign: ca_create: %s", error);
     if (ca_load (ca, true, error) < 0)
         imp_die (1, "casign: ca_load: %s", error);
-    if (ca_sign (ca, cert, ttl, userid, error) < 0)
+    if (ca_sign (ca, cert, 0, ttl, userid, error) < 0)
         imp_die (1, "casign: ca_sign: %s", error);
     if (sigcert_fwrite_public (cert, stdout) < 0)
         imp_die (1, "casign: write stdout: %s", strerror (errno));

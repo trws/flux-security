@@ -131,7 +131,8 @@ void ca_destroy (struct ca *ca)
 }
 
 static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
-                      struct sigcert *cert, int64_t ttl, int64_t userid,
+                      struct sigcert *cert, time_t not_valid_before_time,
+                      int64_t ttl, int64_t userid,
                       bool ca_capability, ca_error_t e)
 {
     int64_t max_cert_ttl = cf_int64 (cf_get_in (ca->cf, "max-cert-ttl"));
@@ -151,15 +152,20 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
         ttl = max_cert_ttl;
     if (time (&now) == (time_t)-1)
         goto error;
+    if (not_valid_before_time == 0)
+        not_valid_before_time = now;
+
     uuid_generate (uuid_bin);
     uuid_unparse (uuid_bin, uuid);
     if (sigcert_meta_set (cert, "uuid", SM_STRING, uuid) < 0)
         goto error;
-    if (sigcert_meta_set (cert, "not-valid-before-time", SM_TIMESTAMP, now) < 0)
+    if (sigcert_meta_set (cert, "not-valid-before-time", SM_TIMESTAMP,
+                          not_valid_before_time) < 0)
         goto error;
     if (sigcert_meta_set (cert, "ctime", SM_TIMESTAMP, now) < 0)
         goto error;
-    if (sigcert_meta_set (cert, "xtime", SM_TIMESTAMP, now + ttl) < 0)
+    if (sigcert_meta_set (cert, "xtime", SM_TIMESTAMP,
+                          not_valid_before_time + ttl) < 0)
         goto error;
     if (sigcert_meta_set (cert, "userid", SM_INT64, userid) < 0)
         goto error;
@@ -187,9 +193,10 @@ error:
 }
 
 int ca_sign (const struct ca *ca, struct sigcert *cert,
-             int64_t ttl, int64_t userid, ca_error_t e)
+             time_t not_valid_before_time, int64_t ttl,
+             int64_t userid, ca_error_t e)
 {
-    if (!ca || !cert || ttl < 0 || userid < 0) {
+    if (!ca || !cert || ttl < 0 || not_valid_before_time < 0 || userid < 0) {
         errno = EINVAL;
         ca_error (e, NULL);
         return -1;
@@ -204,7 +211,8 @@ int ca_sign (const struct ca *ca, struct sigcert *cert,
         ca_error (e, "CA cert does not contain secret key");
         return -1;
     }
-    return sign_with (ca, ca->ca_cert, cert, ttl, userid, false, e);
+    return sign_with (ca, ca->ca_cert, cert, not_valid_before_time, ttl,
+                      userid, false, e);
 }
 
 int ca_revoke (const struct ca *ca, const char *uuid, ca_error_t e)
@@ -352,7 +360,7 @@ int ca_keygen (struct ca *ca, ca_error_t e)
      * we would add to a user certificate, except that
      * ca-capability = true.
      */
-    if (sign_with (ca, cert, cert, 0, getuid (), true, e) < 0) {
+    if (sign_with (ca, cert, cert, 0, 0, getuid (), true, e) < 0) {
         sigcert_destroy (cert);
         return -1;
     }
