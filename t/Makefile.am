@@ -34,6 +34,7 @@ test_cppflags = \
 	$(AM_CPPFLAGS)
 
 test_ldadd = \
+	$(top_builddir)/src/libca/libca.la \
 	$(top_builddir)/src/libutil/libutil.la \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la \
 	$(top_builddir)/src/imp/testconfig.o

@@ -86,6 +86,7 @@ AC_CONFIG_FILES( \
   src/libtap/Makefile \
   src/libtomlc99/Makefile \
   src/libutil/Makefile \
+  src/libca/Makefile \
   src/imp/Makefile \
 )
 

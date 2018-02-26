@@ -10,9 +10,9 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "src/libutil/sigcert.h"
 #include "src/libutil/cf.h"
-#include "src/libutil/ca.h"
+#include "src/libca/sigcert.h"
+#include "src/libca/ca.h"
 
 extern const char *imp_get_config_pattern (void);
 

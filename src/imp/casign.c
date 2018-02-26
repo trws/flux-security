@@ -34,9 +34,9 @@
 #include <errno.h>
 
 #include "src/libutil/kv.h"
-#include "src/libutil/sigcert.h"
 #include "src/libutil/cf.h"
-#include "src/libutil/ca.h"
+#include "src/libca/sigcert.h"
+#include "src/libca/ca.h"
 
 #include "imp_log.h"
 #include "imp_state.h"

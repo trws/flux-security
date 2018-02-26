@@ -4,7 +4,7 @@
 #include <time.h>
 
 #include "sigcert.h"
-#include "cf.h"
+#include "src/libutil/cf.h"
 
 /* Mechanism:
  *

@@ -9,9 +9,9 @@
 #include <errno.h>
 
 #include "src/libtap/tap.h"
+#include "src/libutil/cf.h"
 #include "sigcert.h"
 #include "ca.h"
-#include "cf.h"
 
 const char *conf_tmpl = \
 "max-cert-ttl = 60\n" \
