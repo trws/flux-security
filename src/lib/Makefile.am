@@ -9,12 +9,17 @@ AM_LDFLAGS = \
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-DINSTALLED_CF_PATTERN=\"$(fluxcfdir)/*.toml\" \
 	$(SODIUM_CFLAGS) $(JANSSON_CFLAGS)
 
 noinst_LTLIBRARIES = \
 	libflux-security.la
 
-libflux_security_la_SOURCES =
+libflux_security_la_SOURCES = \
+	context.c
+
+fluxsecurityinclude_HEADERS = \
+	context.h
 
 check_PROGRAMS = \
 	$(TESTS)

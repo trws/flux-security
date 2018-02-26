@@ -74,6 +74,17 @@ PKG_CHECK_MODULES([LIBUUID], [uuid], [], [])
 #
 AX_CODE_COVERAGE
 
+#
+# Project directories
+#
+AS_VAR_SET(fluxlibdir, $libdir/flux)
+AC_SUBST(fluxlibdir)
+
+AS_VAR_SET(fluxcfdir, $sysconfdir/flux/conf.d)
+AC_SUBST(fluxcfdir)
+
+AS_VAR_SET(fluxsecurityincludedir, $includedir/flux/security)
+AC_SUBST(fluxsecurityincludedir)
 
 #
 #  Epilogue
