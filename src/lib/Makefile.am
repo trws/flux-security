@@ -35,6 +35,9 @@ libsecurity_la_SOURCES = \
 	context.c \
 	context_private.h
 
+TESTS = \
+	test_context.t
+
 check_PROGRAMS = \
 	$(TESTS)
 
@@ -52,5 +55,9 @@ test_ldadd = \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la \
 	$(top_builddir)/src/libtap/libtap.la \
 	$(SODIUM_LIBS) $(JANSSON_LIBS)
+
+test_context_t_SOURCES = test/context.c
+test_context_t_CPPFLAGS = $(test_cppflags)
+test_context_t_LDADD = $(test_ldadd)
 
 EXTRA_DIST = libflux-security.map
