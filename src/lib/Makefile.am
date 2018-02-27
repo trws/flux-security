@@ -4,23 +4,36 @@ AM_CFLAGS = \
 	$(CODE_COVERAGE_CFLAGS)
 
 AM_LDFLAGS = \
-	$(CODE_COVERAGE_LIBS) \
-	$(SODIUM_LIBS) $(JANSSON_LIBS)
+	$(CODE_COVERAGE_LIBS)
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-DINSTALLED_CF_PATTERN=\"$(fluxcfdir)/*.toml\" \
 	$(SODIUM_CFLAGS) $(JANSSON_CFLAGS)
 
-noinst_LTLIBRARIES = \
+fluxlib_LTLIBRARIES = \
 	libflux-security.la
 
-libflux_security_la_SOURCES = \
-	context.c \
-	context_private.h
+noinst_LTLIBRARIES = \
+	libsecurity.la
 
 fluxsecurityinclude_HEADERS = \
 	context.h
+
+libflux_security_la_SOURCES =
+libflux_security_la_LIBADD = \
+	$(builddir)/libsecurity.la \
+	$(top_builddir)/src/libutil/libutil.la \
+	$(top_builddir)/src/libtomlc99/libtomlc99.la \
+	$(SODIUM_LIBS) $(JANSSON_LIBS)
+
+libflux_security_la_LDFLAGS = \
+	-Wl,--version-script=$(srcdir)/libflux-security.map \
+	-shared -export-dynamic --disable-static
+
+libsecurity_la_SOURCES = \
+	context.c \
+	context_private.h
 
 check_PROGRAMS = \
 	$(TESTS)
@@ -33,7 +46,11 @@ test_cppflags = \
 	$(AM_CPPFLAGS)
 
 test_ldadd = \
-	$(top_builddir)/src/lib/libflux-security.la \
-	$(top_builddir)/src/libtomlc99/libtomlc99.la \
+	$(AM_LDFLAGS) \
+	$(builddir)/libsecurity.la \
 	$(top_builddir)/src/libutil/libutil.la \
-	$(top_builddir)/src/libtap/libtap.la
+	$(top_builddir)/src/libtomlc99/libtomlc99.la \
+	$(top_builddir)/src/libtap/libtap.la \
+	$(SODIUM_LIBS) $(JANSSON_LIBS)
+
+EXTRA_DIST = libflux-security.map
