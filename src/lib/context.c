@@ -187,6 +187,28 @@ void *flux_security_aux_get (flux_security_t *ctx, const char *name)
     return item->data;
 }
 
+const cf_t *security_get_config (flux_security_t *ctx, const char *key)
+{
+    const cf_t *cf;
+
+    if (!ctx || !key) {
+        errno = EINVAL;
+        security_error (ctx, NULL);
+        return NULL;
+    }
+    if (!ctx->config) {
+        errno = EINVAL;
+        security_error (ctx, "configuration has not been loaded");
+        return NULL;
+    }
+    if (!(cf = cf_get_in (ctx->config, key))) {
+        security_error (ctx, "configuration object '%s' not found", key);
+        return NULL;
+    }
+    return cf;
+
+}
+
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
  */
