@@ -120,32 +120,35 @@ int flux_security_configure (flux_security_t *ctx, const char *pattern)
 {
     struct cf_error cfe;
     int n;
+    cf_t *cf = NULL;
 
     if (!ctx) {
         errno = EINVAL;
-        security_error (ctx, NULL);
         return -1;
     }
     if (!pattern)
         pattern = INSTALLED_CF_PATTERN;
-    if (!(ctx->config = cf_create ())) {
+    if (!(cf = cf_create ())) {
         security_error (ctx, NULL);
         return -1;
     }
-    if ((n = cf_update_glob (ctx->config, pattern, &cfe)) < 0) {
-        if (cfe.lineno != -1)
-            security_error (ctx, "%s::%d: %s",
-                           cfe.filename, cfe.lineno, cfe.errbuf);
-        else
-            security_error (ctx, "%s", cfe.errbuf);
-        return -1;
+    if ((n = cf_update_glob (cf, pattern, &cfe)) < 0) {
+        security_error (ctx, "%s::%d: %s",
+                        cfe.filename, cfe.lineno, cfe.errbuf);
+        goto error;
     }
     if (n == 0) {
         errno = EINVAL;
         security_error (ctx, "pattern %s matched nothing", pattern);
-        return -1;
+        goto error;
     }
+    cf_destroy (ctx->config);
+    ctx->config = cf;
     return 0;
+error:
+    cf_destroy (cf);
+    errno = flux_security_last_errnum (ctx);
+    return -1;
 }
 
 int flux_security_aux_set (flux_security_t *ctx, const char *name,
