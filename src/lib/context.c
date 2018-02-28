@@ -35,6 +35,7 @@
 #include "src/libutil/hash.h"
 
 #include "context.h"
+#include "context_private.h"
 
 struct flux_security {
     cf_t *config;
@@ -57,10 +58,10 @@ static void aux_item_destroy (struct aux_item *item)
     }
 }
 
-/* Update 'e' if non-NULL.
+/* Capture errno in ctx->errno, and an error message in ctx->error.
  * If 'fmt' is non-NULL, build message; otherwise use strerror (errno).
  */
-static void ferr (flux_security_t *ctx, const char *fmt, ...)
+void security_error (flux_security_t *ctx, const char *fmt, ...)
 {
     if (ctx) {
         size_t sz = sizeof (ctx->error);
@@ -122,25 +123,26 @@ int flux_security_configure (flux_security_t *ctx, const char *pattern)
 
     if (!ctx) {
         errno = EINVAL;
-        ferr (ctx, NULL);
+        security_error (ctx, NULL);
         return -1;
     }
     if (!pattern)
         pattern = INSTALLED_CF_PATTERN;
     if (!(ctx->config = cf_create ())) {
-        ferr (ctx, NULL);
+        security_error (ctx, NULL);
         return -1;
     }
     if ((n = cf_update_glob (ctx->config, pattern, &cfe)) < 0) {
         if (cfe.lineno != -1)
-            ferr (ctx, "%s::%d: %s", cfe.filename, cfe.lineno, cfe.errbuf);
+            security_error (ctx, "%s::%d: %s",
+                           cfe.filename, cfe.lineno, cfe.errbuf);
         else
-            ferr (ctx, "%s", cfe.errbuf);
+            security_error (ctx, "%s", cfe.errbuf);
         return -1;
     }
     if (n == 0) {
         errno = EINVAL;
-        ferr (ctx, "pattern %s matched nothing", pattern);
+        security_error (ctx, "pattern %s matched nothing", pattern);
         return -1;
     }
     return 0;
@@ -153,11 +155,11 @@ int flux_security_aux_set (flux_security_t *ctx, const char *name,
 
     if (!ctx || !name || !data) {
         errno = EINVAL;
-        ferr (ctx, NULL);
+        security_error (ctx, NULL);
         return -1;
     }
     if (!(item = calloc (1, sizeof (*item)))) {
-        ferr (ctx, NULL);
+        security_error (ctx, NULL);
         return -1;
     }
     item->data = data;
@@ -177,7 +179,7 @@ void *flux_security_aux_get (flux_security_t *ctx, const char *name)
 
     if (!ctx || !name) {
         errno = EINVAL;
-        ferr (ctx, NULL);
+        security_error (ctx, NULL);
         return NULL;
     }
     if (!(item = hash_find (ctx->aux, name)))

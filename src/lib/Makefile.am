@@ -16,7 +16,8 @@ noinst_LTLIBRARIES = \
 	libflux-security.la
 
 libflux_security_la_SOURCES = \
-	context.c
+	context.c \
+	context_private.h
 
 fluxsecurityinclude_HEADERS = \
 	context.h
