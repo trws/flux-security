@@ -11,7 +11,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "src/libutil/sigcert.h"
+#include "src/libca/sigcert.h"
 
 const char *prog = "keygen";
 

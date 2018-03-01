@@ -9,9 +9,9 @@
 #include <errno.h>
 
 #include "src/libtap/tap.h"
+#include "src/libutil/cf.h"
 #include "signer.h"
 #include "ca.h"
-#include "cf.h"
 
 const char *ca_cf = \
 "max-cert-ttl = 60\n" \

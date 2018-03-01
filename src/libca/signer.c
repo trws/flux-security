@@ -34,9 +34,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "base64.h"
+#include "src/libutil/base64.h"
+#include "src/libutil/kv.h"
 #include "sigcert.h"
-#include "kv.h"
 #include "signer.h"
 
 /* max allowable clock drift (seconds) in case ctime exceeds wall clock

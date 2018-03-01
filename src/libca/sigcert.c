@@ -40,9 +40,9 @@
 #include <time.h>
 #include <sodium.h>
 
-#include "base64.h"
-#include "tomltk.h"
-#include "kv.h"
+#include "src/libutil/base64.h"
+#include "src/libutil/tomltk.h"
+#include "src/libutil/kv.h"
 
 #include "sigcert.h"
 

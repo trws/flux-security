@@ -14,6 +14,7 @@ libexec_PROGRAMS = \
 	flux-imp
 
 flux_imp_LDADD = \
+	$(top_builddir)/src/libca/libca.la \
 	$(top_builddir)/src/libutil/libutil.la \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la
 

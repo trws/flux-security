@@ -37,10 +37,10 @@
 #include <uuid.h>
 #include <assert.h>
 
-#include "ca.h"
-#include "cf.h"
+#include "src/libutil/cf.h"
+#include "src/libutil/base64.h"
 #include "sigcert.h"
-#include "base64.h"
+#include "ca.h"
 
 typedef char uuidstr_t[37];     // see uuid_unparse(3)
 

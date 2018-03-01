@@ -26,24 +26,15 @@ libutil_la_SOURCES = \
 	cf.h \
 	kv.c \
 	kv.h \
-	sigcert.c \
-	sigcert.h \
 	timestamp.c \
-	timestamp.h \
-	ca.c \
-	ca.h \
-	signer.c \
-	signer.h
+	timestamp.h
 
 TESTS = \
 	test_base64.t \
 	test_hash.t \
 	test_tomltk.t \
 	test_cf.t \
-	test_kv.t \
-	test_sigcert.t \
-	test_ca.t \
-	test_signer.t
+	test_kv.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -80,15 +71,3 @@ test_cf_t_LDADD = $(test_ldadd)
 test_kv_t_SOURCES = test/kv.c
 test_kv_t_LDADD = $(test_ldadd)
 test_kv_t_CPPFLAGS = $(test_cppflags)
-
-test_sigcert_t_SOURCES = test/sigcert.c
-test_sigcert_t_LDADD = $(test_ldadd)
-test_sigcert_t_CPPFLAGS = $(test_cppflags)
-
-test_ca_t_SOURCES = test/ca.c
-test_ca_t_LDADD = $(test_ldadd)
-test_ca_t_CPPFLAGS = $(test_cppflags)
-
-test_signer_t_SOURCES = test/signer.c
-test_signer_t_LDADD = $(test_ldadd)
-test_signer_t_CPPFLAGS = $(test_cppflags)
