@@ -60,6 +60,8 @@ static const struct cf_option sign_opts[] = {
 
 static const struct sign_mech *lookup_mech (const char *name)
 {
+    if (!strcmp (name, "none"))
+        return &sign_mech_none;
     return NULL;
 }
 

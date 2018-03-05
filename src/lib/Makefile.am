@@ -36,7 +36,8 @@ libsecurity_la_SOURCES = \
 	context.c \
 	context_private.h \
 	sign.c \
-	sign_mech.h
+	sign_mech.h \
+	sign_none.c
 
 TESTS = \
 	test_context.t

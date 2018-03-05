@@ -55,4 +55,6 @@ struct sign_mech {
     sign_mech_verify_f verify;
 };
 
+extern const struct sign_mech sign_mech_none;
+
 #endif /* !_FLUX_SECURITY_SIGN_MECH_H */
