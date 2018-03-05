@@ -7,6 +7,8 @@ extern "C" {
 
 typedef struct flux_security flux_security_t;
 
+typedef void (*flux_security_free_f)(void *arg);
+
 flux_security_t *flux_security_create (int flags);
 void flux_security_destroy (flux_security_t *ctx);
 
@@ -16,7 +18,7 @@ int flux_security_last_errnum (flux_security_t *ctx);
 int flux_security_configure (flux_security_t *ctx, const char *pattern);
 
 int flux_security_aux_set (flux_security_t *ctx, const char *name,
-		           void *data, void (*free)(void *));
+		           void *data, flux_security_free_f freefun);
 
 void *flux_security_aux_get (flux_security_t *ctx, const char *name);
 
