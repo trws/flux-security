@@ -182,15 +182,16 @@ static struct sign *sign_init (flux_security_t *ctx)
 
     if (!sign) {
         if (!(sign = sign_create (ctx)))
-            return NULL;
+            goto error;
         if (flux_security_aux_set (ctx, auxname, sign,
-                                   (flux_security_free_f)sign_destroy) < 0) {
-            sign_destroy (sign);
-            security_error (ctx, NULL);
-            return NULL;
-        }
+                                   (flux_security_free_f)sign_destroy) < 0)
+            goto error;
     }
     return sign;
+error:
+    sign_destroy (sign);
+    security_error (ctx, NULL);
+    return NULL;
 }
 
 /* Convert header to base64, storing in buf/bufsz, growing as needed.
