@@ -27,14 +27,17 @@ libutil_la_SOURCES = \
 	kv.c \
 	kv.h \
 	timestamp.c \
-	timestamp.h
+	timestamp.h \
+	sha256.c \
+	sha256.h
 
 TESTS = \
 	test_base64.t \
 	test_hash.t \
 	test_tomltk.t \
 	test_cf.t \
-	test_kv.t
+	test_kv.t \
+	test_sha256.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -71,3 +74,7 @@ test_cf_t_LDADD = $(test_ldadd)
 test_kv_t_SOURCES = test/kv.c
 test_kv_t_LDADD = $(test_ldadd)
 test_kv_t_CPPFLAGS = $(test_cppflags)
+
+test_sha256_t_SOURCES = test/sha256.c
+test_sha256_t_LDADD = $(test_ldadd)
+test_sha256_t_CPPFLAGS = $(test_cppflags)
