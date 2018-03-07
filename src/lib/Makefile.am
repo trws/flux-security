@@ -18,7 +18,8 @@ noinst_LTLIBRARIES = \
 	libsecurity.la
 
 fluxsecurityinclude_HEADERS = \
-	context.h
+	context.h \
+	sign.h
 
 libflux_security_la_SOURCES =
 libflux_security_la_LIBADD = \
@@ -33,10 +34,14 @@ libflux_security_la_LDFLAGS = \
 
 libsecurity_la_SOURCES = \
 	context.c \
-	context_private.h
+	context_private.h \
+	sign.c \
+	sign_mech.h \
+	sign_none.c
 
 TESTS = \
-	test_context.t
+	test_context.t \
+	test_sign.t
 
 check_PROGRAMS = \
 	$(TESTS)
@@ -59,5 +64,9 @@ test_ldadd = \
 test_context_t_SOURCES = test/context.c
 test_context_t_CPPFLAGS = $(test_cppflags)
 test_context_t_LDADD = $(test_ldadd)
+
+test_sign_t_SOURCES = test/sign.c
+test_sign_t_CPPFLAGS = $(test_cppflags)
+test_sign_t_LDADD = $(test_ldadd)
 
 EXTRA_DIST = libflux-security.map

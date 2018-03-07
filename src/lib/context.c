@@ -46,7 +46,7 @@ struct flux_security {
 
 struct aux_item {
     void *data;
-    void (*free)(void *);
+    flux_security_free_f free;
 };
 
 static void aux_item_destroy (struct aux_item *item)
@@ -152,7 +152,7 @@ error:
 }
 
 int flux_security_aux_set (flux_security_t *ctx, const char *name,
-                           void *data, void (*freefun)(void *))
+                           void *data, flux_security_free_f freefun)
 {
     struct aux_item *item;
 
