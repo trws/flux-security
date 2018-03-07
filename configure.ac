@@ -68,6 +68,7 @@ AC_HEADER_STDC
 PKG_CHECK_MODULES([SODIUM], [libsodium], [], [])
 PKG_CHECK_MODULES([JANSSON], [jansson], [], [])
 PKG_CHECK_MODULES([LIBUUID], [uuid], [], [])
+PKG_CHECK_MODULES([MUNGE], [munge], [], [])
 
 #
 #  Other checks

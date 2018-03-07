@@ -31,7 +31,8 @@ check_PROGRAMS = \
 
 test_cppflags = \
 	-I$(top_srcdir) \
-	$(AM_CPPFLAGS)
+	$(AM_CPPFLAGS) \
+	$(MUNGE_CFLAGS)
 
 test_ldadd = \
 	$(top_builddir)/src/libca/libca.la \
