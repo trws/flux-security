@@ -62,6 +62,8 @@ static const struct sign_mech *lookup_mech (const char *name)
 {
     if (!strcmp (name, "none"))
         return &sign_mech_none;
+    else if (!strcmp (name, "munge"))
+        return &sign_mech_munge;
     return NULL;
 }
 
