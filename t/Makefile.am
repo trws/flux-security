@@ -1,5 +1,6 @@
 AM_CFLAGS = \
 	$(WARNING_CFLAGS) \
+	-Wno-unused-parameter \
 	$(CODE_COVERAGE_CFLAGS)
 
 AM_LDFLAGS = \
@@ -27,7 +28,9 @@ check_PROGRAMS = \
 	src/keygen \
 	src/certutil \
 	src/ca \
-	src/cf
+	src/cf \
+	src/sign \
+	src/verify
 
 test_cppflags = \
 	-I$(top_srcdir) \
@@ -35,10 +38,12 @@ test_cppflags = \
 	$(MUNGE_CFLAGS)
 
 test_ldadd = \
+	$(top_builddir)/src/lib/libsecurity.la \
 	$(top_builddir)/src/libca/libca.la \
 	$(top_builddir)/src/libutil/libutil.la \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la \
-	$(top_builddir)/src/imp/testconfig.o
+	$(top_builddir)/src/imp/testconfig.o \
+	$(MUNGE_LIBS)
 
 src_keygen_SOURCES = src/keygen.c
 src_keygen_CPPFLAGS = $(test_cppflags)
@@ -55,6 +60,14 @@ src_ca_LDADD = $(test_ldadd)
 src_cf_SOURCES = src/cf.c
 src_cf_CPPFLAGS = $(test_cppflags)
 src_cf_LDADD = $(test_ldadd)
+
+src_sign_SOURCES = src/sign.c
+src_sign_CPPFLAGS = $(test_cppflags)
+src_sign_LDADD = $(test_ldadd)
+
+src_verify_SOURCES = src/verify.c
+src_verify_CPPFLAGS = $(test_cppflags)
+src_verify_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \
