@@ -16,13 +16,15 @@ TESTS = \
 	t0000-sharness.t \
 	t0100-sudo-unit-tests.t \
 	t1000-imp-basic.t \
-	t1001-imp-casign.t
+	t1001-imp-casign.t \
+	t1002-sign-munge.t
 
 check_SCRIPTS = \
 	t0000-sharness.t \
 	t0100-sudo-unit-tests.t \
 	t1000-imp-basic.t \
-	t1001-imp-casign.t
+	t1001-imp-casign.t \
+	t1002-sign-munge.t
 
 check_PROGRAMS = \
 	src/keygen \
