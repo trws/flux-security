@@ -24,24 +24,22 @@ munged_create_key()
 ##
 munged_start_daemon()
 {
-    local EXEC MASK=$(umask) SOCKET KEYFILE LOGFILE PIDFILE SEEDFILE &&
+    local EXEC MASK=$(umask) SOCKET KEYFILE PIDFILE &&
     if test $# -gt 0; then
         EXEC=$1
         shift
     fi &&
     SOCKET="${TMPDIR:-"/tmp"}/munged.sock.$$" &&
     KEYFILE="munged.key.$$" &&
-    LOGFILE="munged.log.$$" &&
     PIDFILE="munged.pid.$$" &&
-    SEEDFILE="munged.seed.$$" &&
     umask 022 &&
     munged_create_key "${KEYFILE}" &&
     ${EXEC} "${MUNGED}" \
         --socket="${SOCKET}" \
         --key-file="$(pwd)/${KEYFILE}" \
-        --log-file="$(pwd)/${LOGFILE}" \
         --pid-file="$(pwd)/${PIDFILE}" \
-        --seed-file="$(pwd)/${SEEDFILE}" \
+        --syslog \
+        --force \
         "$@" &&
     umask "${MASK}" &&
     MUNGE_PIDFILE="${PIDFILE}" &&
