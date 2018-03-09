@@ -148,7 +148,7 @@ static struct sign *sign_create (flux_security_t *ctx)
     }
     if (!(sign->config = security_get_config (ctx, "sign")))
         goto error;
-    if (cf_check (sign->config, sign_opts, CF_STRICT, &e) < 0) {
+    if (cf_check (sign->config, sign_opts, CF_STRICT | CF_ANYTAB, &e) < 0) {
         security_error (ctx, "sign: config error: %s", e.errbuf);
         goto error;
     }
