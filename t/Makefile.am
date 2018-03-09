@@ -30,7 +30,8 @@ check_PROGRAMS = \
 	src/ca \
 	src/cf \
 	src/sign \
-	src/verify
+	src/verify \
+	src/xsign_munge
 
 test_cppflags = \
 	-I$(top_srcdir) \
@@ -68,6 +69,10 @@ src_sign_LDADD = $(test_ldadd)
 src_verify_SOURCES = src/verify.c
 src_verify_CPPFLAGS = $(test_cppflags)
 src_verify_LDADD = $(test_ldadd)
+
+src_xsign_munge_SOURCES = src/xsign_munge.c
+src_xsign_munge_CPPFLAGS = $(test_cppflags)
+src_xsign_munge_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \
