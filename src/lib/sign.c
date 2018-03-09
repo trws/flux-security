@@ -152,8 +152,10 @@ static struct sign *sign_create (flux_security_t *ctx)
         security_error (ctx, "sign: config error: %s", e.errbuf);
         goto error;
     }
+    /* Allow -100 for testing
+     */
     max_ttl = cf_int64 (cf_get_in (sign->config, "max-ttl"));
-    if (max_ttl <= 0) {
+    if (max_ttl <= 0 && max_ttl != -100) {
         errno = EINVAL;
         security_error (ctx, "sign: max-ttl should be greater than zero");
         goto error;
