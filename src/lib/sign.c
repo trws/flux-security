@@ -62,6 +62,8 @@ static const struct sign_mech *lookup_mech (const char *name)
 {
     if (!strcmp (name, "none"))
         return &sign_mech_none;
+    else if (!strcmp (name, "munge"))
+        return &sign_mech_munge;
     return NULL;
 }
 
@@ -148,12 +150,14 @@ static struct sign *sign_create (flux_security_t *ctx)
     }
     if (!(sign->config = security_get_config (ctx, "sign")))
         goto error;
-    if (cf_check (sign->config, sign_opts, CF_STRICT, &e) < 0) {
+    if (cf_check (sign->config, sign_opts, CF_STRICT | CF_ANYTAB, &e) < 0) {
         security_error (ctx, "sign: config error: %s", e.errbuf);
         goto error;
     }
+    /* Allow -100 for testing
+     */
     max_ttl = cf_int64 (cf_get_in (sign->config, "max-ttl"));
-    if (max_ttl <= 0) {
+    if (max_ttl <= 0 && max_ttl != -100) {
         errno = EINVAL;
         security_error (ctx, "sign: max-ttl should be greater than zero");
         goto error;
@@ -182,15 +186,17 @@ static struct sign *sign_init (flux_security_t *ctx)
 
     if (!sign) {
         if (!(sign = sign_create (ctx)))
-            return NULL;
+            goto error_nomsg;
         if (flux_security_aux_set (ctx, auxname, sign,
-                                   (flux_security_free_f)sign_destroy) < 0) {
-            sign_destroy (sign);
-            security_error (ctx, NULL);
-            return NULL;
-        }
+                                   (flux_security_free_f)sign_destroy) < 0)
+            goto error;
     }
     return sign;
+error:
+    security_error (ctx, NULL);
+error_nomsg:
+    sign_destroy (sign);
+    return NULL;
 }
 
 /* Convert header to base64, storing in buf/bufsz, growing as needed.
