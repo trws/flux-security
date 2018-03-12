@@ -7,26 +7,33 @@ Start munge daemon if available and test basic functionality
 of sign-munge mechanism.
 '
 
-export MUNGED=munged
-
 # Append --logfile option if FLUX_TESTS_LOGFILE is set in environment:
 test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 . `dirname $0`/sharness.sh
 
-if ! ${MUNGED} --version; then
-	skip_all="${MUNGED} could not be executed.  Skipping all tests"
+# If system munge is configured and running, use it.
+# If not, attempt to start munged on the side using functions defined
+# in sharness.d/03-munge.sh.  If that doesn't work, skip the whole test.
+if munge </dev/null | unmunge >/dev/null; then
+	echo "System munge works"
+	export MUNGE_SOCKET=$(munged --help | grep socket \
+					    | sed 's/.*\[\(.*\)\]$/\1/')
+elif munged --version; then
+	test_set_prereq SIDEMUNGE
+	export MUNGED=munged  # needed by 03-munge.sh
+	export MUNGE_SOCKET   # set by 03-munge.sh, used below and xsign_munge
+else
+	skip_all="Could not find working munge.  Skipping all tests"
 	test_done
 fi
 
 sign=${SHARNESS_BUILD_DIRECTORY}/t/src/sign
 xsign=${SHARNESS_BUILD_DIRECTORY}/t/src/xsign_munge
 verify=${SHARNESS_BUILD_DIRECTORY}/t/src/verify
-export FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/*.toml
+export FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/sign.toml
 
-# Export this for xsign_munge util
-export MUNGE_SOCKET
 
-test_expect_success 'start munged' '
+test_expect_success SIDEMUNGE 'start munged' '
 	munged_start_daemon
 '
 
@@ -67,32 +74,38 @@ test_expect_success 'verify a hand-created test message' '
 
 test_expect_success 'message with wrong userid fails verify' '
 	${xsign} xuser </dev/null >xuser.out &&
-	test_must_fail ${verify} <xuser.out
+	test_must_fail ${verify} <xuser.out 2>xuser.err &&
+	grep -q "uid mismatch" xuser.err
 '
 
 test_expect_success 'message with unknown hash type fails verify' '
 	${xsign} xhashtype </dev/null >xhashtype.out &&
-	test_must_fail ${verify} <xhashtype.out
+	test_must_fail ${verify} <xhashtype.out 2>xhashtype.err &&
+	grep -q "unknown hash type" xhashtype.err
 '
 
 test_expect_success 'message with truncated hash fails verify' '
 	${xsign} xhashtrunc </dev/null >xhashtrunc.out &&
-	test_must_fail ${verify} <xhashtrunc.out
+	test_must_fail ${verify} <xhashtrunc.out 2>xhashtrunc.err &&
+	grep -q "hash mismatch" xhashtrunc.err
 '
 
 test_expect_success 'message with altered hash fails verify' '
 	${xsign} xhashchg </dev/null >xhashchg.out &&
-	test_must_fail ${verify} <xhashchg.out
+	test_must_fail ${verify} <xhashchg.out 2>xhashchg.err &&
+	grep -q "hash mismatch" xhashchg.err
 '
 
 test_expect_success 'message with altered payload fails verify' '
 	${xsign} xpaychg </dev/null >xpaychg.out &&
-	test_must_fail ${verify} <xpaychg.out
+	test_must_fail ${verify} <xpaychg.out 2>xpaychg.err &&
+	grep -q "hash mismatch" xpaychg.err
 '
 
 test_expect_success 'message with altered munge cred fails verify' '
 	${xsign} xcredchg </dev/null >xcredchg.out &&
-	test_must_fail ${verify} <xcredchg.out
+	test_must_fail ${verify} <xcredchg.out 2>xcredchg.err &&
+	grep -q "munge_decode" xcredchg.err
 '
 
 # N.B. max-ttl = (exactly) -100 is allowed for testing
@@ -110,7 +123,8 @@ test_expect_success 'create sign.toml with max-ttl=-100' '
 test_expect_success 'message with expired TTL fails verify' '
 	cat /dev/null >zttl.in &&
 	${sign} <zttl.in >zttl.out &&
-	test_must_fail ${verify} <zttl.out
+	test_must_fail ${verify} <zttl.out 2>zttl.err &&
+	grep -q ttl zttl.err
 '
 
 test_expect_success 'create sign.toml with bogus entry' '
@@ -126,10 +140,11 @@ test_expect_success 'create sign.toml with bogus entry' '
 '
 
 test_expect_success 'init fails with bad [sign.munge] config' '
-	test_must_fail ${sign} </dev/null
+	test_must_fail ${sign} </dev/null 2>bogussign.err &&
+	grep -q bogus bogussign.err
 '
 
-test_expect_success 'stop munged' '
+test_expect_success SIDEMUNGE 'stop munged' '
 	munged_stop_daemon
 '
 
