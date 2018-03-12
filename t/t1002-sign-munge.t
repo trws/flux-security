@@ -7,26 +7,33 @@ Start munge daemon if available and test basic functionality
 of sign-munge mechanism.
 '
 
-export MUNGED=munged
-
 # Append --logfile option if FLUX_TESTS_LOGFILE is set in environment:
 test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 . `dirname $0`/sharness.sh
 
-if ! ${MUNGED} --version; then
-	skip_all="${MUNGED} could not be executed.  Skipping all tests"
+# If system munge is configured and running, use it.
+# If not, attempt to start munged on the side using functions defined
+# in sharness.d/03-munge.sh.  If that doesn't work, skip the whole test.
+if munge </dev/null | unmunge >/dev/null; then
+	echo "System munge works"
+	export MUNGE_SOCKET=$(munged --help | grep socket \
+					    | sed 's/.*\[\(.*\)\]$/\1/')
+elif munged --version; then
+	test_set_prereq SIDEMUNGE
+	export MUNGED=munged  # needed by 03-munge.sh
+	export MUNGE_SOCKET   # set by 03-munge.sh, used below and xsign_munge
+else
+	skip_all="Could not find working munge.  Skipping all tests"
 	test_done
 fi
 
 sign=${SHARNESS_BUILD_DIRECTORY}/t/src/sign
 xsign=${SHARNESS_BUILD_DIRECTORY}/t/src/xsign_munge
 verify=${SHARNESS_BUILD_DIRECTORY}/t/src/verify
-export FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/*.toml
+export FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/sign.toml
 
-# Export this for xsign_munge util
-export MUNGE_SOCKET
 
-test_expect_success 'start munged' '
+test_expect_success SIDEMUNGE 'start munged' '
 	munged_start_daemon
 '
 
@@ -129,7 +136,7 @@ test_expect_success 'init fails with bad [sign.munge] config' '
 	test_must_fail ${sign} </dev/null
 '
 
-test_expect_success 'stop munged' '
+test_expect_success SIDEMUNGE 'stop munged' '
 	munged_stop_daemon
 '
 
