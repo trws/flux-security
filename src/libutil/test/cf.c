@@ -104,7 +104,7 @@ void test_basic (void)
     cf_cpy = cf_copy (cf);
     ok (cf_cpy != NULL,
         "cf_copy works");
-    ok (cf_typeof (cf) == CF_TABLE,
+    ok (cf_typeof (cf_cpy) == CF_TABLE,
         "cf_typeof says copy is CF_TABLE");
     cf_destroy (cf_cpy);
 
