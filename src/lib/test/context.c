@@ -65,6 +65,10 @@ void test_basic (void)
     errno = 0;
     ok (security_get_config (ctx, "wrongname") == NULL && errno == ENOENT,
         "security_get_config key=wrongname fails with ENOENT");
+    cf = security_get_config (ctx, NULL);
+    ok (cf != NULL && cf_typeof (cf) == CF_TABLE && cf_get_in (cf, "foo"),
+        "security_get_config with NULL argument returns whole config");
+
     flux_security_destroy (ctx);
 }
 
