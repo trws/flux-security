@@ -194,7 +194,7 @@ const cf_t *security_get_config (flux_security_t *ctx, const char *key)
 {
     const cf_t *cf;
 
-    if (!ctx || !key) {
+    if (!ctx) {
         errno = EINVAL;
         security_error (ctx, NULL);
         return NULL;
@@ -204,7 +204,9 @@ const cf_t *security_get_config (flux_security_t *ctx, const char *key)
         security_error (ctx, "configuration has not been loaded");
         return NULL;
     }
-    if (!(cf = cf_get_in (ctx->config, key))) {
+    if (key == NULL)
+        cf = ctx->config;
+    else if (!(cf = cf_get_in (ctx->config, key))) {
         security_error (ctx, "configuration object '%s' not found", key);
         return NULL;
     }
