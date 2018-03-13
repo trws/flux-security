@@ -47,7 +47,7 @@ static int read_all (void *buf, int bufsz)
 int main (int argc, char **argv)
 {
     flux_security_t *ctx;
-    char buf[1024];
+    char buf[8192];
     int buflen;
     int64_t userid;
     const char *payload;
