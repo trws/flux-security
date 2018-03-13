@@ -214,6 +214,24 @@ const cf_t *security_get_config (flux_security_t *ctx, const char *key)
 
 }
 
+int security_set_config (flux_security_t *ctx, const cf_t *cf)
+{
+    cf_t *new;
+    if (!ctx || !cf) {
+        errno = EINVAL;
+        security_error (ctx, NULL);
+        return (-1);
+    }
+    if (!(new = cf_copy (cf))) {
+        errno = ENOMEM;
+        security_error (ctx, "Failed to copy config object");
+        return (-1);
+    }
+    cf_destroy (ctx->config);
+    ctx->config = new;
+    return (0);
+}
+
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
  */
