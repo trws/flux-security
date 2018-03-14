@@ -252,7 +252,10 @@ static int signature_cat (const char *sig, void **buf, int *bufsz)
     int len = strlen (*buf);
     char *dst;
 
-    if (grow_buf (buf, bufsz, strlen(sig) + len + 1) < 0)
+    /* Grow buffer large enought to contain:
+     * current header (len), '.' separator, signature, and final NUL.
+     */
+    if (grow_buf (buf, bufsz, strlen(sig) + len + 2) < 0)
         return -1;
     dst = (char *)*buf + len;
     *dst++ = '.';
