@@ -9,9 +9,14 @@
  */
 void security_error (flux_security_t *ctx, const char *fmt, ...);
 
-/* Retrieve config object by 'key'.
+/* Retrieve config object by 'key', entire config if key == NULL.
  * Returns the object (do not free), or NULL on error.
  */
 const cf_t *security_get_config (flux_security_t *ctx, const char *key);
+
+/* Set config object 'cf' as security handle configuration.
+ * 'cf' is copied internally and any existing configuration is destroyed.
+ */
+int security_set_config (flux_security_t *ctx, const cf_t *cf);
 
 #endif /* !_FLUX_SECURITY_CONTEXT_PRIVATE_H */

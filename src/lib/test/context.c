@@ -65,6 +65,49 @@ void test_basic (void)
     errno = 0;
     ok (security_get_config (ctx, "wrongname") == NULL && errno == ENOENT,
         "security_get_config key=wrongname fails with ENOENT");
+    cf = security_get_config (ctx, NULL);
+    ok (cf != NULL && cf_typeof (cf) == CF_TABLE && cf_get_in (cf, "foo"),
+        "security_get_config with NULL argument returns whole config");
+
+    flux_security_destroy (ctx);
+}
+
+void test_set_config (void)
+{
+    flux_security_t *ctx;
+    const cf_t *cf1;
+    cf_t *cf;
+
+    ok ((ctx = flux_security_create (0)) != NULL,
+        "flux_security_create");
+    ok ((cf = cf_create ()) != NULL,
+        "cf_create");
+    ok (cf_update (cf, conf, strlen (conf), NULL) == 0,
+        "cf_update");
+    ok (security_set_config (ctx, cf) == 0,
+        "security_set_config (cf)");
+    cf_destroy (cf);
+
+    cf1 = security_get_config (ctx, "foo");
+    ok (cf1 != NULL && cf_typeof (cf1) == CF_INT64 && cf_int64 (cf1) == 42,
+        "security_get_config retrieved valid object");
+
+    ok (security_set_config (ctx, cf1) == 0,
+        "security_set_config replaces existing config");
+    /* No need to destroy cf1 since it was owned by ctx->config (cf)
+     */
+
+    cf1 = security_get_config (ctx, NULL);
+    ok (cf1 != NULL && cf_typeof (cf1) == CF_INT64 && cf_int64 (cf1) == 42,
+        "security_get_config retrieved correct object");
+
+    errno = 0;
+    ok (security_set_config (ctx, NULL) < 0 && errno == EINVAL,
+        "security_set_config fails with NULL cf");
+    errno = 0;
+    ok (security_set_config (NULL, cf1) < 0 && errno == EINVAL,
+        "security_set_config fails with NULL ctx argument");
+
     flux_security_destroy (ctx);
 }
 
@@ -212,6 +255,7 @@ int main (int argc, char *argv[])
     conf_init ();
 
     test_basic ();
+    test_set_config ();
     test_error ();
     test_aux ();
     test_corner ();
