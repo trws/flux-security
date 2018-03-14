@@ -36,6 +36,9 @@ check_PROGRAMS = \
 	src/xsign_munge \
 	src/xsign_curve
 
+check_LTLIBRARIES = \
+	src/getpwuid.la
+
 test_cppflags = \
 	-I$(top_srcdir) \
 	$(AM_CPPFLAGS) \
@@ -48,6 +51,13 @@ test_ldadd = \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la \
 	$(top_builddir)/src/imp/testconfig.o \
 	$(MUNGE_LIBS)
+
+# N.B. -rpath is required to build a noinst shared library
+src_getpwuid_la_SOURCES = src/getpwuid.c
+src_getpwuid_la_LDFLAGS = \
+        -avoid-version -export-symbols-regex 'getpwuid' \
+        --disable-static -shared -export-dynamic -module \
+	-rpath $(abs_builddir)
 
 src_keygen_SOURCES = src/keygen.c
 src_keygen_CPPFLAGS = $(test_cppflags)
