@@ -144,6 +144,25 @@ test_expect_success 'init fails with bad [sign.munge] config' '
 	grep -q bogus bogussign.err
 '
 
+test_expect_success 'create sign.toml with none default-type' '
+	cat >sign.toml <<-EOT
+	[sign]
+	max-ttl = 60
+	default-type = "none"
+	allowed-types = [ "munge" ]
+	[sign.munge]
+	socket-path = "${MUNGE_SOCKET}"
+	EOT
+'
+
+test_expect_success 'message encoded with mechanism != munge fails' '
+	cat /dev/null >sign_none.in &&
+        ${sign} <sign_none.in >sign_none.out &&
+	test_must_fail ${verify} <sign_none.out 2>sign_none.err &&
+	test_debug cat sign_none.err &&
+	grep -q "mechanism=none not allowed" sign_none.err
+'
+
 test_expect_success SIDEMUNGE 'stop munged' '
 	munged_stop_daemon
 '
