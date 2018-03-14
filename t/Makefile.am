@@ -34,7 +34,8 @@ check_PROGRAMS = \
 	src/sign \
 	src/verify \
 	src/xsign_munge \
-	src/xsign_curve
+	src/xsign_curve \
+	src/uidlookup
 
 check_LTLIBRARIES = \
 	src/getpwuid.la
@@ -90,6 +91,10 @@ src_xsign_munge_LDADD = $(test_ldadd)
 src_xsign_curve_SOURCES = src/xsign_curve.c
 src_xsign_curve_CPPFLAGS = $(test_cppflags)
 src_xsign_curve_LDADD = $(test_ldadd)
+
+src_uidlookup_SOURCES = src/uidlookup.c
+src_uidlookup_CPPFLAGS = $(test_cppflags)
+src_uidlookup_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \
