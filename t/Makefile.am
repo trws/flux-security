@@ -33,7 +33,8 @@ check_PROGRAMS = \
 	src/cf \
 	src/sign \
 	src/verify \
-	src/xsign_munge
+	src/xsign_munge \
+	src/xsign_curve
 
 test_cppflags = \
 	-I$(top_srcdir) \
@@ -75,6 +76,10 @@ src_verify_LDADD = $(test_ldadd)
 src_xsign_munge_SOURCES = src/xsign_munge.c
 src_xsign_munge_CPPFLAGS = $(test_cppflags)
 src_xsign_munge_LDADD = $(test_ldadd)
+
+src_xsign_curve_SOURCES = src/xsign_curve.c
+src_xsign_curve_CPPFLAGS = $(test_cppflags)
+src_xsign_curve_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \
