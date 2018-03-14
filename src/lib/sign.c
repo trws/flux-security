@@ -302,6 +302,7 @@ const char *flux_sign_wrap (flux_security_t *ctx,
     if (signature_cat (sig, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
 
+    kv_destroy (header);
     return sign->wrapbuf;
 error:
     security_error (ctx, NULL);
