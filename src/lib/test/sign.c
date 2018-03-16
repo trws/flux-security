@@ -280,25 +280,25 @@ void test_badheader (flux_security_t *ctx)
     errno = 0;
     ok (flux_sign_unwrap (ctx, "&&.aGkK.none", NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on not-base64 HEADER with EINVAL");
+        "flux_sign_unwrap fails on not-base64 HEADER with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     errno = 0;
     ok (flux_sign_unwrap (ctx, ".aGkK.none", NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on empty HEADER with EINVAL");
+        "flux_sign_unwrap fails on empty HEADER with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     errno = 0;
     ok (flux_sign_unwrap (ctx, "aGkK.none", NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on missing HEADER delim with EINVAL");
+        "flux_sign_unwrap fails on missing HEADER delim with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     errno = 0;
     ok (flux_sign_unwrap (ctx, "aGkK.none", NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on missing HEADER delim with EINVAL");
+        "flux_sign_unwrap fails on missing HEADER delim with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     /* Test that we can make a working header
@@ -375,21 +375,21 @@ void test_badpayload (flux_security_t *ctx)
     errno = 0;
     ok (flux_sign_unwrap (ctx, input, NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on not-base64 PAYLOAD with EINVAL");
+        "flux_sign_unwrap fails on not-base64 PAYLOAD with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     snprintf (input, sizeof (input), "%s", header);
     errno = 0;
     ok (flux_sign_unwrap (ctx, input, NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on no delims with EINVAL");
+        "flux_sign_unwrap fails on no delims with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     snprintf (input, sizeof (input), "%s.", header);
     errno = 0;
     ok (flux_sign_unwrap (ctx, input, NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on missing PAYLOAD.SIG with EINVAL");
+        "flux_sign_unwrap fails on missing PAYLOAD.SIG with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     free (header);
@@ -406,21 +406,21 @@ void test_badsignature (flux_security_t *ctx)
     errno = 0;
     ok (flux_sign_unwrap (ctx, input, NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on missing SIGNATURE delim with EINVAL");
+        "flux_sign_unwrap fails on missing SIGNATURE delim with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     snprintf (input, sizeof (input), "%s.aGkK.", header);
     errno = 0;
     ok (flux_sign_unwrap (ctx, input, NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on missing SIGNATURE with EINVAL");
+        "flux_sign_unwrap fails on missing SIGNATURE with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     snprintf (input, sizeof (input), "%s.aGkK.foo", header);
     errno = 0;
     ok (flux_sign_unwrap (ctx, input, NULL, NULL, NULL, 0) < 0
         && errno == EINVAL,
-        "flux_unwrap_fails on incorrect SIGNATURE with EINVAL");
+        "flux_sign_unwrap fails on incorrect SIGNATURE with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
 
     free (header);
