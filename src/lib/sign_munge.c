@@ -40,7 +40,6 @@
 
 struct sign_munge {
     munge_ctx_t munge;
-    char *cred_cache;
     int64_t max_ttl;
 };
 
@@ -67,7 +66,6 @@ static void sm_destroy (struct sign_munge *sm)
         int saved_errno = errno;
         if (sm->munge)
             munge_ctx_destroy (sm->munge);
-        free (sm->cred_cache);
         free (sm);
         errno = saved_errno;
     }
@@ -118,8 +116,8 @@ error_nomsg:
  * producing a munge credential.
  * Reserve first byte of munge payload to indicate which hash algorithm.
  */
-static const char *op_sign (flux_security_t *ctx, const char *input,
-                              int flags)
+static char *op_sign (flux_security_t *ctx,
+                      const char *input, int inputsz, int flags)
 {
     struct sign_munge *sm = flux_security_aux_get (ctx, auxname);
     BYTE digest[SHA256_BLOCK_SIZE + 1] = { HASH_TYPE_SHA256 };
@@ -129,7 +127,7 @@ static const char *op_sign (flux_security_t *ctx, const char *input,
 
     assert (sm != NULL);
     sha256_init (&shx);
-    sha256_update (&shx, (const BYTE *)input, strlen (input));
+    sha256_update (&shx, (const BYTE *)input, inputsz);
     sha256_final (&shx, digest + 1);
     e = munge_encode (&cred, sm->munge, digest, sizeof (digest));
     if (e != EMUNGE_SUCCESS) {
@@ -138,9 +136,7 @@ static const char *op_sign (flux_security_t *ctx, const char *input,
                         munge_ctx_strerror (sm->munge));
         return NULL;
     }
-    free (sm->cred_cache);
-    sm->cred_cache = cred;
-    return sm->cred_cache;
+    return cred;
 }
 
 /* Recompute hash over HEADER.PAYLOAD portion of input, then munge_decode
@@ -149,11 +145,11 @@ static const char *op_sign (flux_security_t *ctx, const char *input,
  * - security header userid matches munge cred uid
  * - munge encode time plus configured max-ttl is not past.
  */
-static int op_verify (flux_security_t *ctx, const char *input,
-                        const struct kv *header, int flags)
+static int op_verify (flux_security_t *ctx, const struct kv *header,
+                      const char *input, int inputsz,
+                      const char *signature, int flags)
 {
     struct sign_munge *sm = flux_security_aux_get (ctx, auxname);
-    char *q;
     munge_err_t e;
     char *indigest = NULL;
     int indigestsz = 0;
@@ -165,14 +161,8 @@ static int op_verify (flux_security_t *ctx, const char *input,
 
     assert (sm != NULL);
 
-    /* HEADER.PAYLOAD.SIGNATURE
-     * ^input        ^q
-     */
-    q = strrchr (input, '.');
-    assert (q != NULL);
-
-    e = munge_decode (q + 1, sm->munge, (void **)&indigest,
-                                                 &indigestsz, &uid, NULL);
+    e = munge_decode (signature, sm->munge, (void **)&indigest,
+                                                     &indigestsz, &uid, NULL);
     if (e != EMUNGE_SUCCESS && e != EMUNGE_CRED_REPLAYED
                             && e != EMUNGE_CRED_EXPIRED) {
         errno = EINVAL;
@@ -187,7 +177,7 @@ static int op_verify (flux_security_t *ctx, const char *input,
             SHA256_CTX shx;
 
             sha256_init (&shx);
-            sha256_update (&shx, (const BYTE *)input, q - input);
+            sha256_update (&shx, (const BYTE *)input, inputsz);
             sha256_final (&shx, refdigest + 1);
 
             if (indigestsz != sizeof (refdigest)

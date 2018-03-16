@@ -37,16 +37,21 @@
 #include "sign.h"
 #include "sign_mech.h"
 
-static const char *op_sign (flux_security_t *ctx, const char *input, int flags)
+static char *op_sign (flux_security_t *ctx,
+                            const char *input, int inputsz, int flags)
 {
-    return "none";
+    char *cpy;
+    if (!(cpy = strdup ("none"))) {
+        security_error (ctx, NULL);
+        return NULL;
+    }
+    return cpy;
 }
 
-static int op_verify (flux_security_t *ctx, const char *input,
-                      const struct kv *header, int flags)
+static int op_verify (flux_security_t *ctx, const struct kv *header,
+                      const char *input, int inputsz,
+                      const char *signature, int flags)
 {
-    int len = strlen (input);
-    int siglen = strlen (".none");
     int64_t userid;
     int64_t real_userid = getuid ();
 
@@ -57,7 +62,7 @@ static int op_verify (flux_security_t *ctx, const char *input,
                         (long)userid, (long)real_userid);
         return -1;
     }
-    if (len < siglen || strcmp (input + len - siglen, ".none") != 0) {
+    if (strcmp (signature, "none") != 0) {
         security_error (ctx, "sign-none-verify: signature invalid");
         return -1;
     }

@@ -31,21 +31,25 @@ typedef int (*sign_mech_prep_f)(flux_security_t *ctx, struct kv *header,
                                 int flags);
 
 /* sign (required)
- * Given serialized HEADER.PAYLOAD, generate a signature string, e.g.
- * just the SIGNATURE portion of the final output.
+ * Sign input/inputsz (input != NULL, inputsz > 0), generating a
+ * NULL-terminated signature string which the caller must free.
  * 'flags' is identical to 'flags' param of flux_sign_wrap().
- * Return NULL on error with errno and context error set.
+ * Return signature, or NULL on error with errno and context error set.
  */
-typedef const char *(*sign_mech_sign_f)(flux_security_t *ctx,
-                                        const char *input, int flags);
+typedef char *(*sign_mech_sign_f)(flux_security_t *ctx,
+                                  const char *input, int inputsz, int flags);
 
 /* verify (required)
- * Given HEADER.PAYLOAD.SIGNATURE and parsed 'header', validate that
- * SIGNATURE is valid over HEADER.PAYLOAD.
+ * Verify null-terminated 'signature' (signature != NULL) over
+ * input/inputsz (input != NULL, inputsz > 0).
+ * Parsed security 'header' is provided for access to mechanism specific
+ * data, if any, as well as claimed 'userid' value for verification.
  * Return 0 on success, or -1 on error with errno and context error set.
  */
-typedef int (*sign_mech_verify_f)(flux_security_t *ctx, const char *input,
-                                  const struct kv *header, int flags);
+typedef int (*sign_mech_verify_f)(flux_security_t *ctx,
+                                  const struct kv *header,
+				  const char *input, int inputsz,
+				  const char *signature, int flags);
 
 struct sign_mech {
     const char *name;
