@@ -257,4 +257,8 @@ test_expect_success 'verify fails after home cert is removed' '
 	grep -q "error loading cert" yznoca.err
 '
 
+test_expect_success 'sign fails if no password file entry' '
+	! TEST_PASSWD_FILE=/dev/null LD_PRELOAD=${prelib} ${sign} </dev/null
+'
+
 test_done
