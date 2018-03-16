@@ -300,76 +300,6 @@ void test_sign_verify_detached (void)
     sigcert_destroy (cert2);
 }
 
-void test_sign_verify (void)
-{
-    struct sigcert *cert1;
-    struct sigcert *cert2;
-    const char message[] = "foo-bar-baz";
-    char *cpy;
-    int len;
-    int n;
-
-    if (!(cert1 = sigcert_create ()))
-        BAIL_OUT ("sigcert_create: %s", strerror (errno));
-    if (!(cert2 = sigcert_create ()))
-        BAIL_OUT ("sigcert_create: %s", strerror (errno));
-
-    /* Sign message with cert1.
-     */
-    len = sigcert_sign_length (message);
-    ok (len > strlen (message) + 1,
-        "sigcert_sign_length requires extra size");
-    if (!(cpy = malloc (len)))
-        BAIL_OUT ("malloc failed");
-    strncpy (cpy, message, len);
-    ok (sigcert_sign (cert1, cpy, len) == 0,
-        "sigcert_sign works");
-    diag ("%s", cpy ? cpy : "NULL");
-
-    /* Verify with cert1.
-     * cert2 cannot verify message signed by cert1.
-     * cert1 cannot verify tampered message.
-     */
-    n = sigcert_verify (cert1, cpy);
-    ok (n >= 0,
-        "sigcert_verify cert=good works");
-    errno = 0;
-    n = sigcert_verify (cert2, cpy);
-    ok (n < 0 && errno == EINVAL,
-        "sigcert_verify cert=bad fails with EINVAL");
-    errno = 0;
-
-    cpy[0] = 'x'; // tampered
-    errno = 0;
-    n = sigcert_verify (cert1, cpy);
-    ok (n < 0 && errno == EINVAL,
-        "sigcert_verify tampered fails with EINVAL");
-    free (cpy);
-
-    /* Sign/verify NULL and zero-length message.
-     */
-    len = sigcert_sign_length (NULL);
-    ok (len > 0,
-        "sigcert_sign_length NULL requires extra size");
-    if (!(cpy = malloc (len)))
-        BAIL_OUT ("malloc failed");
-    cpy[0] = '\0';
-    ok (sigcert_sign (cert1, cpy, len) == 0,
-        "sigcert_sign works on NULL message");
-    diag ("%s", cpy ? cpy : "NULL");
-    n = sigcert_verify (cert1, cpy);
-    ok (n == 0,
-        "sigcert_verify works on NULL message");
-    free (cpy);
-
-    ok (sigcert_sign_length ("") == len,
-        "sigcert_sign_length \"\" returns same length as NULL");
-
-    sigcert_destroy (cert1);
-    sigcert_destroy (cert2);
-}
-
-
 void test_codec (void)
 {
     struct sigcert *cert;
@@ -864,7 +794,6 @@ int main (int argc, char *argv[])
     test_meta ();
     test_load_store ();
     test_sign_verify_detached ();
-    test_sign_verify ();
     test_codec ();
     test_corner ();
     test_sign_cert ();
