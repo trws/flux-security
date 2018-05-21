@@ -75,6 +75,8 @@ PKG_CHECK_MODULES([MUNGE], [munge], [], [])
 #
 AX_CODE_COVERAGE
 
+AC_PKGCONFIG
+
 #
 # Project directories
 #
