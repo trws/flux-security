@@ -75,6 +75,8 @@ PKG_CHECK_MODULES([MUNGE], [munge], [], [])
 #
 AX_CODE_COVERAGE
 
+AC_PKGCONFIG
+
 #
 # Project directories
 #
@@ -95,6 +97,7 @@ AC_CONFIG_FILES( \
   t/Makefile \
   src/Makefile \
   src/lib/Makefile \
+  src/lib/flux-security.pc \
   src/libtap/Makefile \
   src/libtomlc99/Makefile \
   src/libutil/Makefile \
