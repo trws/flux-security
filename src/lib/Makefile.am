@@ -11,7 +11,7 @@ AM_CPPFLAGS = \
 	-DINSTALLED_CF_PATTERN=\"$(fluxcfdir)/*.toml\" \
 	$(SODIUM_CFLAGS) $(JANSSON_CFLAGS) $(MUNGE_CFLAGS)
 
-fluxlib_LTLIBRARIES = \
+lib_LTLIBRARIES = \
 	libflux-security.la
 
 noinst_LTLIBRARIES = \
