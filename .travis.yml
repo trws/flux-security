@@ -48,3 +48,25 @@ after_success:
 
 after_failure:
   - find . -name t[0-9]*.output | xargs -i sh -c 'printf "\033[31mFound {}\033[39m\n";cat {}'
+
+before_deploy:
+  # Get anchor (formatted properly) and base URI for latest tag in NEWS file
+  - export ANCHOR=$(sed -n '/^flux-security version/{s/\.//g; s/\s/-/gp;Q}' NEWS.md)
+  - export TAG_URI="https://github.com/${TRAVIS_REPO_SLUG}/blob/${TRAVIS_TAG}"
+  - export TARBALL=$(echo flux-security*.tar.gz)
+  - ls -l $TARBALL
+  - echo "Deploying tag ${TRAVIS_TAG} as $TARBALL"
+
+deploy:
+  provider: releases
+  skip_cleanup: true
+  file: $TARBALL
+  prerelease: true
+  body: "View [Release Notes](${TAG_URI}/NEWS.md#${ANCHOR}) for flux-security ${TRAVIS_TAG}"
+  on:
+    # Only deploy from first job in build matrix
+    condition: $TRAVIS_JOB_NUMBER = $TRAVIS_BUILD_NUMBER.1
+    tags: true
+    repo: flux-framework/flux-security
+  api_key:
+    secure: LvD5v/+J0/HdfadQgHmtz7Zj7/DLNoGtRzniitH70e5QiD/z0tQxwI7aoh+4adXizXCyT9vfkKgdIzCto/7rRRwqZyD6GsqVgPxL5Ofusl36Mz186Z+2VgCamlBQ4cNIkg9H+O65q0AwXllvG8dWQ4r6f8lQOYEj5HioM5eqXqUX8Lfuf7Ed+OzbWx1RXq0FDxmWfntwEcFvU4DCma8WXhKm0PlpMGAhme42Q4DPa9A3E8GK6mAOavVUeP0ZQ4OjYqkSoRJkPo0OwSnA2symh8/GWoBAlvuL0UIescQaJV4FxqUXydBWNP6LdIEfxyBmeBgN7CoLp4ekEselvj6fDLlyq7CulFnjFEi2DLkofykbcMwt7TX4cdk0i28PiE9LajjmjbH/61a8Xp5/f2rxE1O2saO6elhY7Ek6mmpnAGA2IWQGF08pjGq+xb23qhErf8r1WIGgVhR4/kdn4tJ1PdKvqcuPxhTBqrrlyVV+TyeWfcfwCtnPO29fakUQlANSmMW01bB/yg9z0I4euW4gUUXP2YfS0E3fQ9rwRNadZb/9C+q5ACeUY6c9Lk1Xx/aIuAOdwGD52KH4w6CA6sKyy2ZdRypRqHUmJCQAMvwOQX8Is00KHge4JC5O88ZWAIpE2qThOGgamQjK6tBV171YCvqf9hrjCZlDBKHT7ZaW5f0=
