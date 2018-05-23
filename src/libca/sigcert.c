@@ -871,47 +871,6 @@ int sigcert_verify_detached (const struct sigcert *cert,
     return 0;
 }
 
-int sigcert_sign_length (const char *s)
-{
-    return sizeof (sign_base64_t) + 1 + (s ? strlen (s) : 0);
-}
-
-int sigcert_sign (const struct sigcert *cert, char *buf, int buflen)
-{
-    sign_t sig;
-    int len;
-
-    if (!cert || !cert->secret_valid || buflen < sigcert_sign_length (buf)) {
-        errno = EINVAL;
-        return -1;
-    }
-    len = buf ? strlen (buf) : 0;
-    if (crypto_sign_detached (sig, NULL, (unsigned char *)buf,
-                              len, cert->secret_key) < 0) {
-        errno = EINVAL;
-        return -1;
-    }
-    buf[len] = '.';
-    sigcert_base64_encode_sign (sig, &buf[len + 1]);
-    return 0;
-}
-
-int sigcert_verify (const struct sigcert *cert, const char *s)
-{
-    char *sig;
-    int length;
-
-    if (!(sig = strrchr (s, '.'))) {
-        errno = EINVAL;
-        return -1;
-    }
-    length = sig - s;
-    sig++;
-    if (sigcert_verify_detached (cert, sig, (uint8_t *)s, length) < 0)
-        return -1;
-    return length;
-}
-
 /* Serialize cert2, excluding secret + signature, sign with cert1.
  * Add 'signature' attribute to [curve] stanza.
  */

@@ -17,14 +17,16 @@ TESTS = \
 	t0100-sudo-unit-tests.t \
 	t1000-imp-basic.t \
 	t1001-imp-casign.t \
-	t1002-sign-munge.t
+	t1002-sign-munge.t \
+	t1003-sign-curve.t
 
 check_SCRIPTS = \
 	t0000-sharness.t \
 	t0100-sudo-unit-tests.t \
 	t1000-imp-basic.t \
 	t1001-imp-casign.t \
-	t1002-sign-munge.t
+	t1002-sign-munge.t \
+	t1003-sign-curve.t
 
 check_PROGRAMS = \
 	src/keygen \
@@ -33,7 +35,12 @@ check_PROGRAMS = \
 	src/cf \
 	src/sign \
 	src/verify \
-	src/xsign_munge
+	src/xsign_munge \
+	src/xsign_curve \
+	src/uidlookup
+
+check_LTLIBRARIES = \
+	src/getpwuid.la
 
 test_cppflags = \
 	-I$(top_srcdir) \
@@ -47,6 +54,13 @@ test_ldadd = \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la \
 	$(top_builddir)/src/imp/testconfig.o \
 	$(MUNGE_LIBS)
+
+# N.B. -rpath is required to build a noinst shared library
+src_getpwuid_la_SOURCES = src/getpwuid.c
+src_getpwuid_la_LDFLAGS = \
+        -avoid-version -export-symbols-regex 'getpwuid' \
+        --disable-static -shared -export-dynamic -module \
+	-rpath $(abs_builddir)
 
 src_keygen_SOURCES = src/keygen.c
 src_keygen_CPPFLAGS = $(test_cppflags)
@@ -75,6 +89,14 @@ src_verify_LDADD = $(test_ldadd)
 src_xsign_munge_SOURCES = src/xsign_munge.c
 src_xsign_munge_CPPFLAGS = $(test_cppflags)
 src_xsign_munge_LDADD = $(test_ldadd)
+
+src_xsign_curve_SOURCES = src/xsign_curve.c
+src_xsign_curve_CPPFLAGS = $(test_cppflags)
+src_xsign_curve_LDADD = $(test_ldadd)
+
+src_uidlookup_SOURCES = src/uidlookup.c
+src_uidlookup_CPPFLAGS = $(test_cppflags)
+src_uidlookup_LDADD = $(test_ldadd)
 
 EXTRA_DIST= \
 	sharness.sh \

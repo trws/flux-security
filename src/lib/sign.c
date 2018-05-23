@@ -64,6 +64,8 @@ static const struct sign_mech *lookup_mech (const char *name)
         return &sign_mech_none;
     else if (!strcmp (name, "munge"))
         return &sign_mech_munge;
+    else if (!strcmp (name, "curve"))
+        return &sign_mech_curve;
     return NULL;
 }
 
@@ -268,8 +270,9 @@ const char *flux_sign_wrap (flux_security_t *ctx,
 {
     struct sign *sign;
     struct kv *header = NULL;
-    const char *sig;
+    char *sig = NULL;
     int64_t userid = getuid (); // real user id
+    int saved_errno;
 
     if (!ctx || flags != 0 || paysz < 0 || (paysz > 0 && pay == NULL)) {
         errno = EINVAL;
@@ -300,24 +303,30 @@ const char *flux_sign_wrap (flux_security_t *ctx,
         goto error;
     if (payload_encode_cat (pay, paysz, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
-    if (!(sig = sign->wrap_mech->sign (ctx, sign->wrapbuf, flags)))
+    if (!(sig = sign->wrap_mech->sign (ctx, sign->wrapbuf,
+                                       strlen (sign->wrapbuf), flags)))
         goto error_msg;
     if (signature_cat (sig, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
 
+    free (sig);
     kv_destroy (header);
     return sign->wrapbuf;
 error:
     security_error (ctx, NULL);
 error_msg:
     kv_destroy (header);
+    saved_errno = errno;
+    free (sig);
+    errno = saved_errno;
     return NULL;
 }
 
 /* Decode HEADER portion of HEADER.PAYLOAD.SIGNATURE
  * Return header on success or NULL on error with errno set.
+ * Set 'endptr' to period ('.') delimiter following HEADER.
  */
-static struct kv *header_decode (const char *input)
+static struct kv *header_decode (const char *input, char **endptr)
 {
     char *p;
     const char *src;
@@ -343,6 +352,7 @@ static struct kv *header_decode (const char *input)
     if (!(header = kv_decode (dst, dstlen)))
         goto error;
     free (dst);
+    *endptr = p;
     return header;
 error:
     saved_errno = errno;
@@ -351,27 +361,25 @@ error:
     return NULL;
 }
 
-/* Decode PAYLOAD portion of HEADER.PAYLOAD.SIGNATURE
- * to buf/bufsz, expanding as needed.  Any existing content is overwritten.
+/* Decode PAYLOAD portion of PAYLOAD.SIGNATURE to buf/bufsz,
+ * expanding as needed.  Any existing content is overwritten.
+ * Set 'endptr' to period ('.') delimiter following PAYLOAD.
  * Return 0 on success, -1 on failure with errno set.
  */
-static int payload_decode_cpy (const char *input, void **buf, int *bufsz)
+static int payload_decode_cpy (const char *input, void **buf, int *bufsz,
+                               char **endptr)
 {
     char *p;
-    char *q;
     int dstlen;
     int srclen;
-    char *src;
+    const char *src;
 
-    /* HEADER.PAYLOAD.SIGNATURE
-     *       ^p      ^q
-     */
-    if (!(p = strchr (input, '.')) || !(q = strchr (p + 1, '.'))) {
+    if (!(p = strchr (input, '.'))) {
         errno = EINVAL;
         return -1;
     }
-    srclen = q - p - 1;
-    src = p + 1;
+    src = input;
+    srclen = p - input;
     dstlen = base64_decode_length (srclen);
     if (grow_buf (buf, bufsz, dstlen) < 0)
         return -1;
@@ -379,6 +387,7 @@ static int payload_decode_cpy (const char *input, void **buf, int *bufsz)
         errno = EINVAL;
         return -1;
     }
+    *endptr = p;
     return dstlen;
 }
 
@@ -408,6 +417,7 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
     const char *mechanism;
     const struct sign_mech *mech;
     const cf_t *allowed_types;
+    char *endptr;
 
     if (!ctx || !input || !(flags == 0 || flags == FLUX_SIGN_NOVERIFY)) {
         errno = EINVAL;
@@ -418,7 +428,7 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
         return -1;
     /* Parse and verify generic portion of security header.
      */
-    if (!(header = header_decode (input))) {
+    if (!(header = header_decode (input, &endptr))) {
         security_error (ctx, "sign-unwrap: header decode error: %s",
                         strerror (errno));
         return -1;
@@ -459,7 +469,8 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
     }
     /* Decode payload
      */
-    len = payload_decode_cpy (input, &sign->unwrapbuf, &sign->unwrapbufsz);
+    len = payload_decode_cpy (endptr + 1, &sign->unwrapbuf, &sign->unwrapbufsz,
+                              &endptr);
     if (len < 0) {
         security_error (ctx, "sign-unwrap: payload decode error: %s",
                         strerror (errno));
@@ -468,7 +479,9 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
     /* Mech-specific verification (optional).
      */
     if (!(flags & FLUX_SIGN_NOVERIFY)) {
-        if (mech->verify (ctx, input, header, flags) < 0)
+        int inputsz = endptr - input;
+        const char *signature = endptr + 1;
+        if (mech->verify (ctx, header, input, inputsz, signature, flags) < 0)
             goto error;
     }
     kv_destroy (header);
