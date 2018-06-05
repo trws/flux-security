@@ -17,6 +17,7 @@
  * local context for the mechanism, and check mechanism configuration, if any.
  * Local context is stored in 'ctx', with destructor.
  * 'cf' is the [sign] security configuration.
+ * This function must be idempotent.
  * Return 0 on success, or -1 on error with errno and context error set.
  */
 typedef int (*sign_mech_init_f)(flux_security_t *ctx, const cf_t *cf);

@@ -118,7 +118,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_neg_ttl)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with neg max-ttl config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -126,7 +126,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_missing_sign)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == ENOENT,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == ENOENT,
         "flux_sign_wrap with missing [sign] config fails with ENOENT");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -134,7 +134,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_missing_default_type)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with missing default-type config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -142,7 +142,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_unknown_default_type)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with unknown default-type config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -150,7 +150,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_missing_allowed_types)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with missing allowed-types config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -158,7 +158,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_empty_allowed_types)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with empty allowed-types config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -166,7 +166,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_unknown_allowed_types)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with unknown allowed-types config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -174,7 +174,7 @@ void test_config (void)
     if (!(ctx = context_init (badconf_nonstring_allowed_types)))
         BAIL_OUT ("failed to set up test config");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap with nonstring allowed-types config fails with EINVAL");
     diag ("%s", flux_security_last_error (ctx));
     flux_security_destroy (ctx);
@@ -191,7 +191,7 @@ void test_basic (flux_security_t *ctx)
 
     /* Sign
      */
-    s = flux_sign_wrap (ctx, inmsg, inmsgsz, 0);
+    s = flux_sign_wrap (ctx, inmsg, inmsgsz, NULL, 0);
     ok (s != NULL,
         "flux_sign_wrap works");
     diag ("%s", s);
@@ -222,7 +222,7 @@ void test_basic (flux_security_t *ctx)
 
     /* Sign/verify zero-length payload
      */
-    s = flux_sign_wrap (ctx, NULL, 0, 0);
+    s = flux_sign_wrap (ctx, NULL, 0, NULL, 0);
     ok (s != NULL,
         "flux_sign_wrap payload=NULL works");
     diag ("%s", s);
@@ -433,19 +433,19 @@ void test_corner (flux_security_t *ctx)
 
     /* Sign something and strdup - to be used as valid input
      */
-    if (!(s = flux_sign_wrap (ctx, "foo", 3, 0)))
+    if (!(s = flux_sign_wrap (ctx, "foo", 3, NULL, 0)))
         BAIL_OUT ("flux_sign_wrap: %s", flux_security_last_error (ctx));
     if (!(cpy = strdup (s)))
         BAIL_OUT ("strdup failed");
 
     errno = 0;
-    ok (flux_sign_wrap (NULL, "foo", 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (NULL, "foo", 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap ctx=NULL fails with EINVAL");
     errno = 0;
-    ok (flux_sign_wrap (ctx, "foo", 3, 0xff) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, "foo", 3, NULL, 0xff) == NULL && errno == EINVAL,
         "flux_sign_wrap flags=0xff fails with EINVAL");
     errno = 0;
-    ok (flux_sign_wrap (ctx, NULL, 3, 0) == NULL && errno == EINVAL,
+    ok (flux_sign_wrap (ctx, NULL, 3, NULL, 0) == NULL && errno == EINVAL,
         "flux_sign_wrap pay=NULL paysz > 0 fails with EINVAL");
 
     errno = 0;

@@ -42,7 +42,6 @@
 
 struct sign {
     const cf_t *config;
-    const struct sign_mech *wrap_mech;
     void *wrapbuf;
     int wrapbufsz;
     void *unwrapbuf;
@@ -168,13 +167,8 @@ static struct sign *sign_create (flux_security_t *ctx)
     if (!validate_mech_array (ctx, allowed_types))
         goto error;
     default_type = cf_string (cf_get_in (sign->config, "default-type"));
-    if (!validate_mech (ctx, default_type, &sign->wrap_mech))
+    if (!validate_mech (ctx, default_type, NULL))
         goto error;
-
-    if (sign->wrap_mech->init) {
-        if (sign->wrap_mech->init (ctx, sign->config) < 0)
-            goto error;
-    }
     return sign;
 error:
     sign_destroy (sign);
@@ -266,11 +260,13 @@ static int signature_cat (const char *sig, void **buf, int *bufsz)
 }
 
 const char *flux_sign_wrap (flux_security_t *ctx,
-                            const void *pay, int paysz, int flags)
+                            const void *pay, int paysz,
+                            const char *mech_type, int flags)
 {
     struct sign *sign;
     struct kv *header = NULL;
     char *sig = NULL;
+    const struct sign_mech *mech;
     int64_t userid = getuid (); // real user id
     int saved_errno;
 
@@ -281,20 +277,29 @@ const char *flux_sign_wrap (flux_security_t *ctx,
     }
     if (!(sign = sign_init (ctx)))
         return NULL;
+    if (!mech_type)
+        mech_type = cf_string (cf_get_in (sign->config, "default-type"));
+    if (!validate_mech (ctx, mech_type, &mech))
+        goto error_msg;
+    if (mech->init) {
+        if (mech->init (ctx, sign->config) < 0)
+            goto error_msg;
+    }
+
     /* Create security header.
      */
     if (!(header = kv_create ()))
         goto error;
     if (kv_put (header, "version", KV_INT64, sign_version) < 0)
         goto error;
-    if (kv_put (header, "mechanism", KV_STRING, sign->wrap_mech->name) < 0)
+    if (kv_put (header, "mechanism", KV_STRING, mech->name) < 0)
         goto error;
     if (kv_put (header, "userid", KV_INT64, userid) < 0)
         goto error;
     /* Call mech->prep, which adds mechanism-specific data to header, if any.
      */
-    if (sign->wrap_mech->prep) {
-        if (sign->wrap_mech->prep (ctx, header, flags) < 0)
+    if (mech->prep) {
+        if (mech->prep (ctx, header, flags) < 0)
             goto error_msg;
     }
     /* Serialize to HEADER.PAYLOAD.SIGNATURE
@@ -303,8 +308,7 @@ const char *flux_sign_wrap (flux_security_t *ctx,
         goto error;
     if (payload_encode_cat (pay, paysz, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
-    if (!(sig = sign->wrap_mech->sign (ctx, sign->wrapbuf,
-                                       strlen (sign->wrapbuf), flags)))
+    if (!(sig = mech->sign (ctx, sign->wrapbuf, strlen (sign->wrapbuf), flags)))
         goto error_msg;
     if (signature_cat (sig, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
@@ -481,6 +485,10 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
     if (!(flags & FLUX_SIGN_NOVERIFY)) {
         int inputsz = endptr - input;
         const char *signature = endptr + 1;
+        if (mech->init) {
+            if (mech->init (ctx, sign->config) < 0)
+                goto error;
+        }
         if (mech->verify (ctx, header, input, inputsz, signature, flags) < 0)
             goto error;
     }
