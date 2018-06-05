@@ -40,7 +40,7 @@ extern "C" {
  */
 
 enum {
-    FLUX_SIGN_NOVERIFY = 1,	// flux_sign_unwrap() need not verify signature
+    FLUX_SIGN_NOVERIFY = 1,   // flux_sign_unwrap() need not verify signature
 };
 
 /* Sign payload/payloadsz, returning a NULL terminated string
@@ -72,3 +72,7 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
 #endif
 
 #endif /* !_FLUX_SECURITY_SIGN_H */
+
+/*
+ * vi:tabstop=4 shiftwidth=4 expandtab
+ */
