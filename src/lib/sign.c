@@ -409,9 +409,11 @@ static bool mech_allowed (const char *name, const cf_t *allowed)
     return false;
 }
 
-int flux_sign_unwrap (flux_security_t *ctx, const char *input,
-                      const void **payload, int *payloadsz,
-                      int64_t *useridp, int flags)
+static int sign_unwrap (flux_security_t *ctx,
+                        const char *input,
+                        const void **payload, int *payloadsz,
+                        const char **mech_typep,
+                        int64_t *useridp, int flags, bool check_allowed)
 {
     struct sign *sign;
     struct kv *header;
@@ -459,12 +461,14 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
                         mechanism);
         goto error;
     }
-    allowed_types = cf_get_in (sign->config, "allowed-types");
-    if (!mech_allowed (mechanism, allowed_types)) {
-        errno = EINVAL;
-        security_error (ctx, "sign-unwrap: header mechanism=%s not allowed",
-                        mechanism);
-        goto error;
+    if (check_allowed) {
+        allowed_types = cf_get_in (sign->config, "allowed-types");
+        if (!mech_allowed (mechanism, allowed_types)) {
+            errno = EINVAL;
+            security_error (ctx, "sign-unwrap: header mechanism=%s not allowed",
+                            mechanism);
+            goto error;
+        }
     }
     if (kv_get (header, "userid", KV_INT64, &userid) < 0) {
         errno = EINVAL;
@@ -497,12 +501,31 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
         *payload = (len > 0 ? sign->unwrapbuf : NULL);
     if (payloadsz)
         *payloadsz = len;
+    if (mech_typep)
+        *mech_typep = mech->name;
     if (useridp)
         *useridp = userid;
     return 0;
 error:
     kv_destroy (header);
     return -1;
+}
+
+int flux_sign_unwrap_anymech (flux_security_t *ctx, const char *input,
+                              const void **payload, int *payloadsz,
+                              const char **mech_type,
+                              int64_t *userid, int flags)
+{
+    return sign_unwrap (ctx, input, payload, payloadsz,
+                        mech_type, userid, flags, false);
+}
+
+int flux_sign_unwrap (flux_security_t *ctx, const char *input,
+                      const void **payload, int *payloadsz,
+                      int64_t *userid, int flags)
+{
+    return sign_unwrap (ctx, input, payload, payloadsz,
+                        NULL, userid, flags, true);
 }
 
 /*

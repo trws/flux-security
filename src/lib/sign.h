@@ -69,6 +69,15 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
                       const void **payload, int *payloadsz,
                       int64_t *userid, int flags);
 
+/* Same as above, but don't limit mech type to only the ones
+ * configured in 'allowed-types'.  Set 'mech_type' to the mechanism
+ * type used.
+ */
+int flux_sign_unwrap_anymech (flux_security_t *ctx, const char *input,
+                              const void **payload, int *payloadsz,
+                              const char **mech_type,
+                              int64_t *userid, int flags);
+
 #ifdef __cplusplus
 }
 #endif
