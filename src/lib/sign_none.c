@@ -63,6 +63,7 @@ static int op_verify (flux_security_t *ctx, const struct kv *header,
         return -1;
     }
     if (strcmp (signature, "none") != 0) {
+        errno = EINVAL;
         security_error (ctx, "sign-none-verify: signature invalid");
         return -1;
     }
