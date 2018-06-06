@@ -235,6 +235,47 @@ void test_basic (flux_security_t *ctx)
         "returned payloadsz=NULL");
 }
 
+void test_mechselect (flux_security_t *ctx)
+{
+    const char *inmsg = "hello world";
+    int inmsgsz = sizeof (inmsg);
+    const char *outmsg;
+    int outmsgsz;
+    const char *s;
+    int64_t userid;
+    const char *mech;
+
+    /* Sign with "none" mech
+     */
+    s = flux_sign_wrap (ctx, inmsg, inmsgsz, "none", 0);
+    ok (s != NULL,
+        "flux_sign_wrap mech=none works");
+    diag ("%s", s);
+
+    /* Unwrap + verify
+     */
+    outmsgsz = 0;
+    outmsg = NULL;
+    mech = NULL;
+    ok (flux_sign_unwrap_anymech (ctx, s, (const void **)&outmsg,
+                                  &outmsgsz, &mech, &userid, 0) == 0,
+        "flux_sign_unwrap_anymech works");
+    ok (outmsgsz == inmsgsz,
+        "unwrapped size matches wrapped size");
+    ok (outmsg != NULL && memcmp (outmsg, inmsg, inmsgsz) == 0,
+        "unwrapped message matches wrapped message");
+    ok (mech != NULL && !strcmp (mech, "none"),
+        "mech=none");
+
+    /* Sign with unknown mech
+     */
+    errno = EINVAL;
+    s = flux_sign_wrap (ctx, inmsg, inmsgsz, "unknown", 0);
+    ok (s == NULL && errno == EINVAL,
+        "flux_sign_wrap mech=unknown fails with EINVAL");
+    diag ("%s", flux_security_last_error (ctx));
+}
+
 /* Construct a HEADER for testing
  */
 char *make_header (int64_t version, const char *mechanism, int64_t userid)
@@ -476,6 +517,7 @@ int main (int argc, char *argv[])
 
     ctx = context_init (conf);
     test_basic (ctx);
+    test_mechselect (ctx);
     test_badheader (ctx);
     test_badpayload (ctx);
     test_badsignature (ctx);
