@@ -61,9 +61,9 @@ static const struct sign_mech *lookup_mech (const char *name)
 {
     if (!strcmp (name, "none"))
         return &sign_mech_none;
-    else if (!strcmp (name, "munge"))
+    if (!strcmp (name, "munge"))
         return &sign_mech_munge;
-    else if (!strcmp (name, "curve"))
+    if (!strcmp (name, "curve"))
         return &sign_mech_curve;
     return NULL;
 }
@@ -94,26 +94,6 @@ static void sign_destroy (struct sign *sign)
     }
 }
 
-static bool validate_mech (flux_security_t *ctx, const char *name,
-                           const struct sign_mech **lookup_result)
-{
-    const struct sign_mech *mech;
-
-    if (!(mech = lookup_mech (name))) {
-        errno = EINVAL;
-        security_error (ctx, "sign-%s: unknown mechanism", name);
-        return false;
-    }
-    if (!mech->sign || !mech->verify) {
-        errno = EINVAL;
-        security_error (ctx, "sign-%s: missing required method(s)", name);
-        return false;
-    }
-    if (lookup_result)
-        *lookup_result = mech;
-    return true;
-}
-
 static bool validate_mech_array (flux_security_t *ctx, const cf_t *mechs)
 {
     int i;
@@ -125,8 +105,11 @@ static bool validate_mech_array (flux_security_t *ctx, const cf_t *mechs)
             security_error (ctx, "sign: allowed-types[%d] not a string", i);
             return false;
         }
-        if (!validate_mech (ctx, cf_string (el), NULL))
+        if (!lookup_mech (cf_string (el))) {
+            errno = EINVAL;
+            security_error (ctx, "sign: unknown mechanism=%s", cf_string (el));
             return false;
+        }
     }
     if (i == 0) {
         errno = EINVAL;
@@ -167,7 +150,7 @@ static struct sign *sign_create (flux_security_t *ctx)
     if (!validate_mech_array (ctx, allowed_types))
         goto error;
     default_type = cf_string (cf_get_in (sign->config, "default-type"));
-    if (!validate_mech (ctx, default_type, NULL))
+    if (!lookup_mech (default_type))
         goto error;
     return sign;
 error:
@@ -279,11 +262,14 @@ const char *flux_sign_wrap (flux_security_t *ctx,
         return NULL;
     if (!mech_type)
         mech_type = cf_string (cf_get_in (sign->config, "default-type"));
-    if (!validate_mech (ctx, mech_type, &mech))
-        goto error_msg;
+    if (!(mech = lookup_mech (mech_type))) {
+        errno = EINVAL;
+        security_error (ctx, "sign-wrap: unknown mechanism: %s", mech_type);
+        return NULL;
+    }
     if (mech->init) {
         if (mech->init (ctx, sign->config) < 0)
-            goto error_msg;
+            return NULL;
     }
 
     /* Create security header.
