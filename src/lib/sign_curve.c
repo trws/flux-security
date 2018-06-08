@@ -68,9 +68,11 @@ static void sc_destroy (struct sign_curve *sc)
  */
 static int op_init (flux_security_t *ctx, const cf_t *cf)
 {
-    struct sign_curve *sc;
+    struct sign_curve *sc = flux_security_aux_get (ctx, auxname);
     struct cf_error cfe;
 
+    if (sc != NULL)
+        return 0;
     if (!(sc = calloc (1, sizeof (*sc))))
         goto error;
     sc->max_ttl = cf_int64 (cf_get_in (cf, "max-ttl"));

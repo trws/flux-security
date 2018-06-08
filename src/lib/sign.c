@@ -42,7 +42,6 @@
 
 struct sign {
     const cf_t *config;
-    const struct sign_mech *wrap_mech;
     void *wrapbuf;
     int wrapbufsz;
     void *unwrapbuf;
@@ -62,9 +61,9 @@ static const struct sign_mech *lookup_mech (const char *name)
 {
     if (!strcmp (name, "none"))
         return &sign_mech_none;
-    else if (!strcmp (name, "munge"))
+    if (!strcmp (name, "munge"))
         return &sign_mech_munge;
-    else if (!strcmp (name, "curve"))
+    if (!strcmp (name, "curve"))
         return &sign_mech_curve;
     return NULL;
 }
@@ -95,26 +94,6 @@ static void sign_destroy (struct sign *sign)
     }
 }
 
-static bool validate_mech (flux_security_t *ctx, const char *name,
-                           const struct sign_mech **lookup_result)
-{
-    const struct sign_mech *mech;
-
-    if (!(mech = lookup_mech (name))) {
-        errno = EINVAL;
-        security_error (ctx, "sign-%s: unknown mechanism", name);
-        return false;
-    }
-    if (!mech->sign || !mech->verify) {
-        errno = EINVAL;
-        security_error (ctx, "sign-%s: missing required method(s)", name);
-        return false;
-    }
-    if (lookup_result)
-        *lookup_result = mech;
-    return true;
-}
-
 static bool validate_mech_array (flux_security_t *ctx, const cf_t *mechs)
 {
     int i;
@@ -126,8 +105,11 @@ static bool validate_mech_array (flux_security_t *ctx, const cf_t *mechs)
             security_error (ctx, "sign: allowed-types[%d] not a string", i);
             return false;
         }
-        if (!validate_mech (ctx, cf_string (el), NULL))
+        if (!lookup_mech (cf_string (el))) {
+            errno = EINVAL;
+            security_error (ctx, "sign: unknown mechanism=%s", cf_string (el));
             return false;
+        }
     }
     if (i == 0) {
         errno = EINVAL;
@@ -168,13 +150,8 @@ static struct sign *sign_create (flux_security_t *ctx)
     if (!validate_mech_array (ctx, allowed_types))
         goto error;
     default_type = cf_string (cf_get_in (sign->config, "default-type"));
-    if (!validate_mech (ctx, default_type, &sign->wrap_mech))
+    if (!lookup_mech (default_type))
         goto error;
-
-    if (sign->wrap_mech->init) {
-        if (sign->wrap_mech->init (ctx, sign->config) < 0)
-            goto error;
-    }
     return sign;
 error:
     sign_destroy (sign);
@@ -266,11 +243,13 @@ static int signature_cat (const char *sig, void **buf, int *bufsz)
 }
 
 const char *flux_sign_wrap (flux_security_t *ctx,
-                            const void *pay, int paysz, int flags)
+                            const void *pay, int paysz,
+                            const char *mech_type, int flags)
 {
     struct sign *sign;
     struct kv *header = NULL;
     char *sig = NULL;
+    const struct sign_mech *mech;
     int64_t userid = getuid (); // real user id
     int saved_errno;
 
@@ -281,20 +260,32 @@ const char *flux_sign_wrap (flux_security_t *ctx,
     }
     if (!(sign = sign_init (ctx)))
         return NULL;
+    if (!mech_type)
+        mech_type = cf_string (cf_get_in (sign->config, "default-type"));
+    if (!(mech = lookup_mech (mech_type))) {
+        errno = EINVAL;
+        security_error (ctx, "sign-wrap: unknown mechanism: %s", mech_type);
+        return NULL;
+    }
+    if (mech->init) {
+        if (mech->init (ctx, sign->config) < 0)
+            return NULL;
+    }
+
     /* Create security header.
      */
     if (!(header = kv_create ()))
         goto error;
     if (kv_put (header, "version", KV_INT64, sign_version) < 0)
         goto error;
-    if (kv_put (header, "mechanism", KV_STRING, sign->wrap_mech->name) < 0)
+    if (kv_put (header, "mechanism", KV_STRING, mech->name) < 0)
         goto error;
     if (kv_put (header, "userid", KV_INT64, userid) < 0)
         goto error;
     /* Call mech->prep, which adds mechanism-specific data to header, if any.
      */
-    if (sign->wrap_mech->prep) {
-        if (sign->wrap_mech->prep (ctx, header, flags) < 0)
+    if (mech->prep) {
+        if (mech->prep (ctx, header, flags) < 0)
             goto error_msg;
     }
     /* Serialize to HEADER.PAYLOAD.SIGNATURE
@@ -303,8 +294,7 @@ const char *flux_sign_wrap (flux_security_t *ctx,
         goto error;
     if (payload_encode_cat (pay, paysz, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
-    if (!(sig = sign->wrap_mech->sign (ctx, sign->wrapbuf,
-                                       strlen (sign->wrapbuf), flags)))
+    if (!(sig = mech->sign (ctx, sign->wrapbuf, strlen (sign->wrapbuf), flags)))
         goto error_msg;
     if (signature_cat (sig, &sign->wrapbuf, &sign->wrapbufsz) < 0)
         goto error;
@@ -405,9 +395,11 @@ static bool mech_allowed (const char *name, const cf_t *allowed)
     return false;
 }
 
-int flux_sign_unwrap (flux_security_t *ctx, const char *input,
-                      const void **payload, int *payloadsz,
-                      int64_t *useridp, int flags)
+static int sign_unwrap (flux_security_t *ctx,
+                        const char *input,
+                        const void **payload, int *payloadsz,
+                        const char **mech_typep,
+                        int64_t *useridp, int flags, bool check_allowed)
 {
     struct sign *sign;
     struct kv *header;
@@ -455,12 +447,14 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
                         mechanism);
         goto error;
     }
-    allowed_types = cf_get_in (sign->config, "allowed-types");
-    if (!mech_allowed (mechanism, allowed_types)) {
-        errno = EINVAL;
-        security_error (ctx, "sign-unwrap: header mechanism=%s not allowed",
-                        mechanism);
-        goto error;
+    if (check_allowed) {
+        allowed_types = cf_get_in (sign->config, "allowed-types");
+        if (!mech_allowed (mechanism, allowed_types)) {
+            errno = EINVAL;
+            security_error (ctx, "sign-unwrap: header mechanism=%s not allowed",
+                            mechanism);
+            goto error;
+        }
     }
     if (kv_get (header, "userid", KV_INT64, &userid) < 0) {
         errno = EINVAL;
@@ -481,6 +475,10 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
     if (!(flags & FLUX_SIGN_NOVERIFY)) {
         int inputsz = endptr - input;
         const char *signature = endptr + 1;
+        if (mech->init) {
+            if (mech->init (ctx, sign->config) < 0)
+                goto error;
+        }
         if (mech->verify (ctx, header, input, inputsz, signature, flags) < 0)
             goto error;
     }
@@ -489,12 +487,31 @@ int flux_sign_unwrap (flux_security_t *ctx, const char *input,
         *payload = (len > 0 ? sign->unwrapbuf : NULL);
     if (payloadsz)
         *payloadsz = len;
+    if (mech_typep)
+        *mech_typep = mech->name;
     if (useridp)
         *useridp = userid;
     return 0;
 error:
     kv_destroy (header);
     return -1;
+}
+
+int flux_sign_unwrap_anymech (flux_security_t *ctx, const char *input,
+                              const void **payload, int *payloadsz,
+                              const char **mech_type,
+                              int64_t *userid, int flags)
+{
+    return sign_unwrap (ctx, input, payload, payloadsz,
+                        mech_type, userid, flags, false);
+}
+
+int flux_sign_unwrap (flux_security_t *ctx, const char *input,
+                      const void **payload, int *payloadsz,
+                      int64_t *userid, int flags)
+{
+    return sign_unwrap (ctx, input, payload, payloadsz,
+                        NULL, userid, flags, true);
 }
 
 /*

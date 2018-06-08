@@ -61,7 +61,7 @@ int main (int argc, char **argv)
 
     buflen = read_all (buf, sizeof (buf));
 
-    if (!(msg = flux_sign_wrap (ctx, buf, buflen, 0)))
+    if (!(msg = flux_sign_wrap (ctx, buf, buflen, NULL, 0)))
         die ("flux_sign_wrap: %s", flux_security_last_error (ctx));
 
     printf ("%s\n", msg);

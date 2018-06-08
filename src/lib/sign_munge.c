@@ -73,10 +73,12 @@ static void sm_destroy (struct sign_munge *sm)
 
 static int op_init (flux_security_t *ctx, const cf_t *cf)
 {
-    struct sign_munge *sm;
+    struct sign_munge *sm = flux_security_aux_get (ctx, auxname);
     const cf_t *munge_config;
     const char *socket_path = NULL;
 
+    if (sm != NULL)
+        return 0;
     if (!(sm = calloc (1, sizeof (*sm))))
         goto error;
     if (!(sm->munge = munge_ctx_create ()))
