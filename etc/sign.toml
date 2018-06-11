@@ -1,0 +1,4 @@
+[sign]
+max-ttl = 1209600  # 2 weeks
+default-type = "munge"
+allowed-types = [ "munge" ]
