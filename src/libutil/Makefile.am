@@ -15,8 +15,6 @@ noinst_LTLIBRARIES = \
 	libutil.la
 
 libutil_la_SOURCES = \
-	base64.c \
-	base64.h \
 	thread.h \
 	hash.c \
 	hash.h \
@@ -33,7 +31,6 @@ libutil_la_SOURCES = \
 	macros.h
 
 TESTS = \
-	test_base64.t \
 	test_hash.t \
 	test_tomltk.t \
 	test_cf.t \
@@ -55,10 +52,6 @@ check_PROGRAMS = \
 TEST_EXTENSIONS = .t
 T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 	$(top_srcdir)/config/tap-driver.sh
-
-test_base64_t_SOURCES = test/base64_test.c
-test_base64_t_CPPFLAGS = $(test_cppflags)
-test_base64_t_LDADD = $(test_ldadd)
 
 test_hash_t_SOURCES = test/hash.c
 test_hash_t_CPPFLAGS = $(test_cppflags)
