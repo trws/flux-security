@@ -40,9 +40,9 @@
 #include <time.h>
 #include <sodium.h>
 
-#include "src/libutil/base64.h"
 #include "src/libutil/tomltk.h"
 #include "src/libutil/kv.h"
+#include "src/libutil/macros.h"
 
 #include "sigcert.h"
 
@@ -52,34 +52,26 @@
  */
 static const size_t cert_read_limit = (1024*1024*10); // 10mb
 
-/* Define some handy types for fixed length keys and their base64 encodings.
- * N.B. macro versions of base64_encode_length() and base64_decode_length()
- * were defined so these types can be declared in a struct or on the stack.
- * Also, the raw types must be long enough to receive base64_decode_length()
- * bytes in place, hence the BASE64_DECODE_MAXLEN() macro below.
+/* Define buffer sizes needed to encode public key, private key,
+ * and signature with base64 (including NULL).
  */
-#define BASE64_ENCODE_LENGTH(srclen) (((((srclen) + 2) / 3) * 4) + 1)
-#define BASE64_DECODE_LENGTH(srclen) (((((srclen) + 3) / 4) * 3) + 1)
-
-#define BASE64_DECODE_MAXLEN(dstlen) \
-             (BASE64_DECODE_LENGTH(BASE64_ENCODE_LENGTH(dstlen)))
-
-typedef uint8_t public_t[BASE64_DECODE_MAXLEN(crypto_sign_PUBLICKEYBYTES)];
-typedef uint8_t secret_t[BASE64_DECODE_MAXLEN(crypto_sign_SECRETKEYBYTES)];
-typedef uint8_t sign_t[BASE64_DECODE_MAXLEN(crypto_sign_BYTES)];
-
-typedef char public_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_PUBLICKEYBYTES)];
-typedef char secret_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_SECRETKEYBYTES)];
-typedef char sign_base64_t[BASE64_ENCODE_LENGTH(crypto_sign_BYTES)];
-
+#define PUBLICKEY_BASE64_SIZE \
+    (sodium_base64_ENCODED_LEN (crypto_sign_PUBLICKEYBYTES, \
+                                sodium_base64_VARIANT_ORIGINAL))
+#define SECRETKEY_BASE64_SIZE \
+    (sodium_base64_ENCODED_LEN (crypto_sign_SECRETKEYBYTES, \
+                                sodium_base64_VARIANT_ORIGINAL))
+#define SIGN_BASE64_SIZE \
+    (sodium_base64_ENCODED_LEN (crypto_sign_BYTES, \
+                                sodium_base64_VARIANT_ORIGINAL))
 
 #define FLUX_SIGCERT_MAGIC 0x2349c0ed
 struct sigcert {
     int magic;
 
-    public_t public_key;
-    secret_t secret_key;
-    sign_t signature;
+    uint8_t public_key[crypto_sign_PUBLICKEYBYTES];
+    uint8_t secret_key[crypto_sign_SECRETKEYBYTES];
+    uint8_t signature[crypto_sign_BYTES];
 
     struct kv *meta;
 
@@ -253,102 +245,28 @@ int sigcert_meta_get (const struct sigcert *cert, const char *key,
     return rc;
 }
 
-/* encode public key 'src' to base64 'dst'
+/* Decode a base64 string string to 'dst', a buffer of size 'dstsz'.
+ * The decoded size must exactly match 'dstsz'.
+ * Return 0 on success, -1 on error.
  */
-static void sigcert_base64_encode_public (const public_t src,
-                                          public_base64_t dst)
+static int decode_base64_exact (const char *src, uint8_t *dst, size_t dstsz)
 {
-    int srclen = crypto_sign_PUBLICKEYBYTES;
-    int dstlen = sizeof (public_base64_t);
-    int rc;
+    int rc = -1;
+    size_t srclen;
+    size_t dstlen;
 
-    assert (dstlen >= base64_encode_length (srclen));
-    rc = base64_encode_block (dst, &dstlen, src, srclen);
-    assert (rc == 0);
-}
-/* decode base64 'src' to public key 'dst'
- * return 0 on success, -1 on failure
- */
-static int sigcert_base64_decode_public (const char *src, public_t dst)
-{
-    int srclen = strlen (src);
-    int dstlen = sizeof (public_t);
-
-    if (dstlen < base64_decode_length (srclen))
-        goto inval;
-    if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
-        goto inval;
-    if (dstlen != crypto_sign_PUBLICKEYBYTES)
-        goto inval;
-    return 0;
-inval:
-    errno = EINVAL;
-    return -1;
-}
-
-/* encode secret key 'src' to base64 'dst'
- */
-static void sigcert_base64_encode_secret (const secret_t src,
-                                          secret_base64_t dst)
-{
-    int srclen = crypto_sign_SECRETKEYBYTES;
-    int dstlen = sizeof (secret_base64_t);
-    int rc;
-
-    assert (dstlen >= base64_encode_length (srclen));
-    rc = base64_encode_block (dst, &dstlen, src, srclen);
-    assert (rc == 0);
-}
-/* decode base64 'src' to secret key 'dst'
- * return 0 on success, -1 on failure
- */
-int sigcert_base64_decode_secret (const char *src, secret_t dst)
-{
-    int srclen = strlen (src);
-    int dstlen = sizeof (secret_t);
-
-    if (dstlen < base64_decode_length (srclen))
-        goto inval;
-    if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
-        goto inval;
-    if (dstlen != crypto_sign_SECRETKEYBYTES)
-        goto inval;
-    return 0;
-inval:
-    errno = EINVAL;
-    return -1;
-}
-
-/* encode signature 'src' to base64 'dst'
- */
-static void sigcert_base64_encode_sign (const sign_t src, sign_base64_t dst)
-{
-    int srclen = crypto_sign_BYTES;
-    int dstlen = sizeof (sign_base64_t);
-    int rc;
-
-    assert (dstlen >= base64_encode_length (srclen));
-    rc = base64_encode_block (dst, &dstlen, src, srclen);
-    assert (rc == 0);
-}
-/* decode base64 'src' to signature 'dst'
- * return 0 on success, -1 on failure
- */
-static int sigcert_base64_decode_sign (const char *src, sign_t dst)
-{
-    int srclen = strlen (src);
-    int dstlen = sizeof (sign_t);
-
-    if (dstlen < base64_decode_length (srclen))
-        goto inval;
-    if (base64_decode_block (dst, &dstlen, src, srclen) < 0)
-        goto inval;
-    if (dstlen != crypto_sign_BYTES)
-        goto inval;
-    return 0;
-inval:
-    errno = EINVAL;
-    return -1;
+    if (!src)
+        goto done;
+    srclen = strlen (src);
+    if (sodium_base642bin (dst, dstsz, src, srclen,
+                           NULL, &dstlen, NULL,
+                           sodium_base64_VARIANT_ORIGINAL) < 0)
+        goto done;
+    if (dstlen != dstsz)
+        goto done;
+    rc = 0;
+done:
+    return rc;
 }
 
 /* fopen(w) with mode parameter
@@ -371,12 +289,14 @@ static FILE *fopen_mode (const char *pathname, mode_t mode)
  */
 static int sigcert_fwrite_secret (const struct sigcert *cert, FILE *fp)
 {
-    secret_base64_t seckey;
+    char seckey[SECRETKEY_BASE64_SIZE];
 
     // [curve]
     if (fprintf (fp, "[curve]\n") < 0)
         return -1;
-    sigcert_base64_encode_secret (cert->secret_key, seckey);
+    sodium_bin2base64 (seckey, sizeof (seckey),
+                       cert->secret_key, sizeof (cert->secret_key),
+                       sodium_base64_VARIANT_ORIGINAL);
     if (fprintf (fp, "    secret-key = \"%s\"\n", seckey) < 0)
         return -1;
     return 0;
@@ -426,14 +346,18 @@ int sigcert_fwrite_public (const struct sigcert *cert, FILE *fp)
     if (fprintf (fp, "[curve]\n") < 0)
         goto error;
 
-    public_base64_t pubkey;
-    sigcert_base64_encode_public (cert->public_key, pubkey);
+    char pubkey[PUBLICKEY_BASE64_SIZE];
+    sodium_bin2base64 (pubkey, sizeof (pubkey),
+                       cert->public_key, sizeof (cert->public_key),
+                       sodium_base64_VARIANT_ORIGINAL);
     if (fprintf (fp, "    public-key = \"%s\"\n", pubkey) < 0)
         goto error;
 
     if (cert->signature_valid) {
-        sign_base64_t sign;
-        sigcert_base64_encode_sign (cert->signature, sign);
+        char sign[SIGN_BASE64_SIZE];
+        sodium_bin2base64 (sign, sizeof (sign),
+                           cert->signature, sizeof (cert->signature),
+                           sodium_base64_VARIANT_ORIGINAL);
         if (fprintf (fp, "    signature = \"%s\"\n", sign) < 0)
             goto error;
     }
@@ -477,45 +401,21 @@ error:
     return -1;
 }
 
-static int parse_toml_public_key (const char *raw, public_t key)
+/* Decode a TOML string string to 'dst', a buffer of size 'dstsz'.
+ * The decoded size must exactly match 'dstsz'.
+ * Return 0 on success, -1 on error with errno set.
+ */
+static int parse_toml_base64_exact (const char *raw, uint8_t *dst, size_t dstsz)
 {
     char *s = NULL;
     int rc = -1;
 
     if (toml_rtos (raw, &s) < 0)
         goto done;
-    if (sigcert_base64_decode_public (s, key) < 0)
+    if (decode_base64_exact (s, dst, dstsz) < 0) {
+        errno = EINVAL;
         goto done;
-    rc = 0;
-done:
-    free (s);
-    return rc;
-}
-
-static int parse_toml_secret_key (const char *raw, secret_t key)
-{
-    char *s = NULL;
-    int rc = -1;
-
-    if (toml_rtos (raw, &s) < 0)
-        goto done;
-    if (sigcert_base64_decode_secret (s, key) < 0)
-        goto done;
-    rc = 0;
-done:
-    free (s);
-    return rc;
-}
-
-static int parse_toml_signature (const char *raw, sign_t sig)
-{
-    char *s = NULL;
-    int rc = -1;
-
-    if (toml_rtos (raw, &s) < 0)
-        goto done;
-    if (sigcert_base64_decode_sign (s, sig) < 0)
-        goto done;
+    }
     rc = 0;
 done:
     free (s);
@@ -622,7 +522,8 @@ static int sigcert_fread_secret (struct sigcert *cert, FILE *fp)
         goto inval;
     if (!(raw = toml_raw_in (curve_table, "secret-key")))
         goto inval;
-    if (parse_toml_secret_key (raw, cert->secret_key) < 0)
+    if (parse_toml_base64_exact (raw, cert->secret_key,
+                                 sizeof (cert->secret_key)) < 0)
         goto inval;
     cert->secret_valid = true;
     free (conf);
@@ -673,10 +574,12 @@ struct sigcert *sigcert_fread_public (FILE *fp)
         goto inval;
     if (!(raw = toml_raw_in (curve_table, "public-key")))
         goto inval;
-    if (parse_toml_public_key (raw, cert->public_key) < 0)
+    if (parse_toml_base64_exact (raw, cert->public_key,
+                                 sizeof (cert->public_key)) < 0)
         goto inval;
     if ((raw = toml_raw_in (curve_table, "signature"))) { // optional
-        if (parse_toml_signature (raw, cert->signature) < 0)
+        if (parse_toml_base64_exact (raw, cert->signature,
+                                     sizeof (cert->signature)) < 0)
             goto inval;
         cert->signature_valid = true;
     }
@@ -730,21 +633,21 @@ error:
     return NULL;
 }
 
-static int get_pubkey (struct kv *kv, uint8_t *pub)
+/* Decode a kv string key to 'dst', a buffer of size 'dstsz'.
+ * The decoded size must exactly match 'dstsz'.
+ * Return 0 on success, -1 on error with errno set.
+ */
+static int get_base64_exact (struct kv *kv, const char *key,
+                             uint8_t *dst, size_t dstsz)
 {
-    const char *pub_s;
-    if (kv_get (kv, "curve.public-key", KV_STRING, &pub_s) < 0)
+    const char *src;
+    if (kv_get (kv, key, KV_STRING, &src) < 0)
         return -1;
-    return sigcert_base64_decode_public (pub_s, pub);
-}
-
-static int get_signature (struct kv *kv, uint8_t *sign)
-{
-    const char *sign_s;
-
-    if (kv_get (kv, "curve.signature", KV_STRING, &sign_s) < 0)
+    if (decode_base64_exact (src, dst, dstsz) < 0) {
+        errno = EINVAL;
         return -1;
-    return sigcert_base64_decode_sign (sign_s, sign);
+    }
+    return 0;
 }
 
 struct sigcert *sigcert_decode (const char *s, int len)
@@ -764,9 +667,11 @@ struct sigcert *sigcert_decode (const char *s, int len)
     kv_destroy (cert->meta);
     if (!(cert->meta = kv_split (kv, "meta.")))
         goto error;
-    if (get_pubkey (kv, cert->public_key) < 0)
+    if (get_base64_exact (kv, "curve.public-key",
+                          cert->public_key, sizeof (cert->public_key)) < 0)
         goto error;
-    if (get_signature (kv, cert->signature) == 0)
+    if (get_base64_exact (kv, "curve.signature",
+                          cert->signature, sizeof (cert->signature)) == 0)
         cert->signature_valid = true;
     else if (errno != ENOENT)
         goto error;
@@ -778,24 +683,10 @@ error:
     return NULL;
 }
 
-static int put_pubkey (struct kv *kv, const uint8_t *pub)
-{
-    public_base64_t pub_s;
-
-    sigcert_base64_encode_public (pub, pub_s);
-    return kv_put (kv, "curve.public-key", KV_STRING, pub_s);
-}
-
-static int put_signature (struct kv *kv, const uint8_t *sign)
-{
-    sign_base64_t sign_s;
-
-    sigcert_base64_encode_sign (sign, sign_s);
-    return kv_put (kv, "curve.signature", KV_STRING, sign_s);
-}
-
 int sigcert_encode (const struct sigcert *cert, const char **buf, int *len)
 {
+    char pubkey[PUBLICKEY_BASE64_SIZE];
+
     if (!cert || !buf || !len) {
         errno = EINVAL;
         return -1;
@@ -805,10 +696,17 @@ int sigcert_encode (const struct sigcert *cert, const char **buf, int *len)
         return -1;
     if (kv_join (cert->enc, cert->meta, "meta.") < 0)
         return -1;
-    if (put_pubkey (cert->enc, cert->public_key) < 0)
+    sodium_bin2base64 (pubkey, sizeof (pubkey),
+                       cert->public_key, sizeof (cert->public_key),
+                       sodium_base64_VARIANT_ORIGINAL);
+    if (kv_put (cert->enc, "curve.public-key", KV_STRING, pubkey) < 0)
         return -1;
     if (cert->signature_valid) {
-        if (put_signature (cert->enc, cert->signature) < 0)
+        char sign[SIGN_BASE64_SIZE];
+        sodium_bin2base64 (sign, sizeof (sign),
+                           cert->signature, sizeof (cert->signature),
+                           sodium_base64_VARIANT_ORIGINAL);
+        if (kv_put (cert->enc, "curve.signature", KV_STRING, sign) < 0)
             return -1;
     }
     return kv_encode (cert->enc, buf, len);
@@ -837,8 +735,8 @@ bool sigcert_equal (const struct sigcert *cert1,
 char *sigcert_sign_detached (const struct sigcert *cert,
                              const uint8_t *buf, int len)
 {
-    sign_t sig;
-    sign_base64_t sig_base64;
+    uint8_t sig[crypto_sign_BYTES];
+    char *sig_base64;
 
     if (!cert || !cert->secret_valid || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
@@ -848,22 +746,28 @@ char *sigcert_sign_detached (const struct sigcert *cert,
         errno = EINVAL;
         return NULL;
     }
-    sigcert_base64_encode_sign (sig, sig_base64);
-    return strdup (sig_base64);
+    if (!(sig_base64 = calloc (1, SIGN_BASE64_SIZE)))
+        return NULL;
+    sodium_bin2base64 (sig_base64, SIGN_BASE64_SIZE,
+                       sig, sizeof (sig),
+                       sodium_base64_VARIANT_ORIGINAL);
+    return sig_base64;
 }
 
 int sigcert_verify_detached (const struct sigcert *cert,
                              const char *signature,
                              const uint8_t *buf, int len)
 {
-    sign_t sig;
+    uint8_t sig[crypto_sign_BYTES];
 
     if (!cert || !signature || len < 0 || (len > 0 && buf == NULL)) {
         errno = EINVAL;
         return -1;
     }
-    if (sigcert_base64_decode_sign (signature, sig) < 0)
+    if (decode_base64_exact (signature, sig, sizeof (sig)) < 0) {
+        errno = EINVAL;
         return -1;
+    }
     if (crypto_sign_verify_detached (sig, buf, len, cert->public_key) < 0) {
         errno = EINVAL;
         return -1;
@@ -881,6 +785,7 @@ int sigcert_sign_cert (const struct sigcert *cert1,
     const char *kv_s;
     int kv_len;
     int rc = -1;
+    char pubkey[PUBLICKEY_BASE64_SIZE];
 
     if (!cert1 || !cert2 || !cert1->secret_valid) {
         errno = EINVAL;
@@ -888,7 +793,10 @@ int sigcert_sign_cert (const struct sigcert *cert1,
     }
     if (!(kv = kv_create()))
         return -1;
-    if (put_pubkey (kv, cert2->public_key) < 0)
+    sodium_bin2base64 (pubkey, sizeof (pubkey),
+                       cert2->public_key, sizeof (cert2->public_key),
+                       sodium_base64_VARIANT_ORIGINAL);
+    if (kv_put (kv, "curve.public_key", KV_STRING, pubkey) < 0)
         goto done;
     if (kv_join (kv, cert2->meta, "meta.") < 0)
         goto done;
@@ -914,6 +822,7 @@ int sigcert_verify_cert (const struct sigcert *cert1,
     const char *kv_s;
     int kv_len;
     int rc = -1;
+    char pubkey[PUBLICKEY_BASE64_SIZE];
 
     if (!cert1 || !cert2 || !cert2->signature_valid) {
         errno = EINVAL;
@@ -921,7 +830,10 @@ int sigcert_verify_cert (const struct sigcert *cert1,
     }
     if (!(kv = kv_create()))
         return -1;
-    if (put_pubkey (kv, cert2->public_key) < 0)
+    sodium_bin2base64 (pubkey, sizeof (pubkey),
+                       cert2->public_key, sizeof (cert2->public_key),
+                       sodium_base64_VARIANT_ORIGINAL);
+    if (kv_put (kv, "curve.public_key", KV_STRING, pubkey) < 0)
         goto done;
     if (kv_join (kv, cert2->meta, "meta.") < 0)
         goto done;
