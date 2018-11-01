@@ -41,7 +41,7 @@
 #include "sigcert.h"
 #include "ca.h"
 
-typedef char uuidstr_t[37];     // see uuid_unparse(3)
+#define UUID_STRING_SIZE    37  // see uuid_unparse(3)
 
 struct ca {
     cf_t *cf;                   // config table is cached
@@ -138,7 +138,7 @@ static int sign_with (const struct ca *ca, const struct sigcert *ca_cert,
     int64_t max_sign_ttl = cf_int64 (cf_get_in (ca->cf, "max-sign-ttl"));
     const char *domain = cf_string (cf_get_in (ca->cf, "domain"));
     uuid_t uuid_bin;
-    uuidstr_t uuid;
+    char uuid[UUID_STRING_SIZE];
     time_t now;
     const char *ca_uuid;
 
