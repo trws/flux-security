@@ -4,10 +4,10 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/param.h>
+#include <sodium.h>
 
 #include "src/libtap/tap.h"
 #include "src/libutil/kv.h"
-#include "src/libutil/base64.h"
 
 #include "src/lib/sign.h"
 
@@ -303,10 +303,12 @@ char *make_header (int64_t version, const char *mechanism, int64_t userid)
     if (kv_encode (header, &src, &srclen) < 0)
        BAIL_OUT ("kv_encode: %s", strerror (errno));
 
-    dstlen = base64_encode_length (srclen);
+    dstlen = sodium_base64_ENCODED_LEN (srclen,
+                                        sodium_base64_VARIANT_ORIGINAL);
     if (!(dst = malloc (dstlen)))
         BAIL_OUT ("malloc failed");
-    (void)base64_encode_block (dst, &dstlen, src, srclen);
+    sodium_bin2base64 (dst, dstlen, (const unsigned char *)src, srclen,
+                       sodium_base64_VARIANT_ORIGINAL);
     kv_destroy (header);
     return dst;
 }
