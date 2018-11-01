@@ -38,7 +38,6 @@
 #include <assert.h>
 
 #include "src/libutil/cf.h"
-#include "src/libutil/base64.h"
 #include "sigcert.h"
 #include "ca.h"
 
