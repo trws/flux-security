@@ -65,7 +65,7 @@ AC_HEADER_STDC
 #
 #  Checks for packages
 #
-PKG_CHECK_MODULES([SODIUM], [libsodium], [], [])
+PKG_CHECK_MODULES([SODIUM], [libsodium >= 1.0.14], [], [])
 PKG_CHECK_MODULES([JANSSON], [jansson], [], [])
 PKG_CHECK_MODULES([LIBUUID], [uuid], [], [])
 PKG_CHECK_MODULES([MUNGE], [munge], [], [])
