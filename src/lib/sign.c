@@ -30,10 +30,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sodium.h>
 
 #include "src/libutil/cf.h"
 #include "src/libutil/kv.h"
-#include "src/libutil/base64.h"
+#include "src/libutil/macros.h"
 
 #include "context.h"
 #include "context_private.h"
@@ -187,15 +188,17 @@ static int header_encode_cpy (struct kv *header, void **buf, int *bufsz)
     const char *src;
     int srclen;
     char *dst;
-    int dstlen;
+    size_t dstlen;
 
     if (kv_encode (header, &src, &srclen) < 0)
         return -1;
-    dstlen = base64_encode_length (srclen);
+    dstlen = sodium_base64_encoded_len (srclen,
+                                        sodium_base64_VARIANT_ORIGINAL);
     if (grow_buf (buf, bufsz, dstlen) < 0)
         return -1;
     dst = *buf;
-    (void)base64_encode_block (dst, &dstlen, src, srclen);
+    sodium_bin2base64 (dst, dstlen, (const unsigned char *)src, srclen,
+                       sodium_base64_VARIANT_ORIGINAL);
     return 0;
 }
 
@@ -212,12 +215,14 @@ static int payload_encode_cat (const void *pay, int paysz,
     char *dst;
 
     len = strlen (*buf);
-    dstlen = base64_encode_length (paysz);
+    dstlen = sodium_base64_encoded_len (paysz,
+                                        sodium_base64_VARIANT_ORIGINAL);
     if (grow_buf (buf, bufsz, dstlen + len + 1) < 0)
         return -1;
     dst = (char *)*buf + len;
     *dst++ = '.';
-    (void)base64_encode_block (dst, &dstlen, pay, paysz);
+    sodium_bin2base64 (dst, dstlen, pay, paysz,
+                       sodium_base64_VARIANT_ORIGINAL);
     return 0;
 }
 
@@ -320,9 +325,9 @@ static struct kv *header_decode (const char *input, char **endptr)
 {
     char *p;
     const char *src;
-    int srclen;
-    char *dst;
-    int dstlen;
+    size_t srclen;
+    void *dst;
+    size_t dstlen;
     struct kv *header;
     int saved_errno;
 
@@ -332,10 +337,12 @@ static struct kv *header_decode (const char *input, char **endptr)
     }
     src = input;
     srclen = p - input;
-    dstlen = base64_decode_length (srclen);
+    dstlen = BASE64_DECODE_SIZE (srclen);
     if (!(dst = malloc (dstlen)))
         return NULL;
-    if (base64_decode_block (dst, &dstlen, src, srclen) < 0) {
+    if (sodium_base642bin (dst, dstlen, src, srclen,
+                           NULL, &dstlen, NULL,
+                           sodium_base64_VARIANT_ORIGINAL) < 0) {
         errno = EINVAL;
         goto error;
     }
@@ -360,8 +367,8 @@ static int payload_decode_cpy (const char *input, void **buf, int *bufsz,
                                char **endptr)
 {
     char *p;
-    int dstlen;
-    int srclen;
+    size_t dstlen;
+    size_t srclen;
     const char *src;
 
     if (!(p = strchr (input, '.'))) {
@@ -370,10 +377,12 @@ static int payload_decode_cpy (const char *input, void **buf, int *bufsz,
     }
     src = input;
     srclen = p - input;
-    dstlen = base64_decode_length (srclen);
+    dstlen = BASE64_DECODE_SIZE (srclen);
     if (grow_buf (buf, bufsz, dstlen) < 0)
         return -1;
-    if (base64_decode_block (*buf, &dstlen, src, srclen) < 0) {
+    if (sodium_base642bin (*buf, dstlen, src, srclen,
+                           NULL, &dstlen, NULL,
+                           sodium_base64_VARIANT_ORIGINAL) < 0) {
         errno = EINVAL;
         return -1;
     }
