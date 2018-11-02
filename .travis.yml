@@ -26,9 +26,9 @@ addons:
       - libjansson-dev
 
 before_install:
-  - curl -L -O --insecure https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz
-  - tar -xf libsodium-1.0.10.tar.gz
-  - (cd libsodium-1.0.10 && ./configure --prefix=$HOME/local && make && make install)
+  - curl -L -O --insecure https://github.com/jedisct1/libsodium/releases/download/1.0.14/libsodium-1.0.14.tar.gz
+  - tar -xf libsodium-1.0.14.tar.gz
+  - (cd libsodium-1.0.14 && ./configure --prefix=$HOME/local && make && make install)
   - curl -L -O --insecure https://github.com/dun/munge/releases/download/munge-0.5.13/munge-0.5.13.tar.xz
   - tar -xJf munge-0.5.13.tar.xz
   - (cd munge-0.5.13 && ./configure --prefix=$HOME/local && make && make install)

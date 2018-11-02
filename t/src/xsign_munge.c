@@ -14,9 +14,9 @@
 #include <errno.h>
 #include <munge.h>
 #include <assert.h>
+#include <sodium.h>
 
 #include "src/libutil/kv.h"
-#include "src/libutil/base64.h"
 #include "src/libutil/sha256.h"
 
 enum {
@@ -69,10 +69,12 @@ static char *make_header (int64_t userid)
         die ("kv_put: %s", strerror (errno));
     if (kv_encode (header, &src, &srclen) < 0)
         die ("kv_encode: %s", strerror (errno));
-    dstlen = base64_encode_length (srclen);
+    dstlen = sodium_base64_ENCODED_LEN (srclen,
+                                        sodium_base64_VARIANT_ORIGINAL);
     if (!(dst = malloc (dstlen)))
         die ("malloc: %s", strerror (errno));
-    (void)base64_encode_block (dst, &dstlen, src, srclen);
+    sodium_bin2base64 (dst, dstlen, (const unsigned char *)src, srclen,
+                       sodium_base64_VARIANT_ORIGINAL);
 
     kv_destroy (header);
 
@@ -84,10 +86,12 @@ static char *make_payload (const void *src, int srclen)
     char *dst;
     int dstlen;
 
-    dstlen = base64_encode_length (srclen);
+    dstlen = sodium_base64_ENCODED_LEN (srclen,
+                                        sodium_base64_VARIANT_ORIGINAL);
     if (!(dst = malloc (dstlen)))
         die ("malloc: %s", strerror (errno));
-    (void)base64_encode_block (dst, &dstlen, src, srclen);
+    sodium_bin2base64 (dst, dstlen, src, srclen,
+                       sodium_base64_VARIANT_ORIGINAL);
     return dst;
 }
 
