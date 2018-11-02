@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "src/lib/context.h"
 #include "src/lib/sign.h"
@@ -63,6 +64,8 @@ int main (int argc, char **argv)
 
     buflen = read_all (buf, sizeof (buf) - 1);
     buf[buflen] = '\0';
+    while (buflen > 0 && isspace (buf[buflen - 1]))
+        buf[--buflen] = '\0';
 
     if (flux_sign_unwrap (ctx, buf, (const void **)&payload, &payloadsz,
                           &userid, 0) < 0)
