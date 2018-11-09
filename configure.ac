@@ -107,6 +107,7 @@ AC_CONFIG_FILES( \
   src/Makefile \
   src/lib/Makefile \
   src/lib/flux-security.pc \
+  src/lib/version.h \
   src/libtap/Makefile \
   src/libtomlc99/Makefile \
   src/libutil/Makefile \

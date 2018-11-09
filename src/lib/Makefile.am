@@ -19,7 +19,8 @@ noinst_LTLIBRARIES = \
 
 fluxsecurityinclude_HEADERS = \
 	context.h \
-	sign.h
+	sign.h \
+	version.h
 
 libflux_security_la_SOURCES =
 libflux_security_la_LIBADD = \
@@ -40,7 +41,8 @@ libsecurity_la_SOURCES = \
 	sign_mech.h \
 	sign_none.c \
 	sign_munge.c \
-	sign_curve.c
+	sign_curve.c \
+	version.c
 
 TESTS = \
 	test_context.t \
