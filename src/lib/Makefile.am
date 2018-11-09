@@ -19,7 +19,8 @@ noinst_LTLIBRARIES = \
 
 fluxsecurityinclude_HEADERS = \
 	context.h \
-	sign.h
+	sign.h \
+	version.h
 
 libflux_security_la_SOURCES =
 libflux_security_la_LIBADD = \
@@ -40,11 +41,13 @@ libsecurity_la_SOURCES = \
 	sign_mech.h \
 	sign_none.c \
 	sign_munge.c \
-	sign_curve.c
+	sign_curve.c \
+	version.c
 
 TESTS = \
 	test_context.t \
-	test_sign.t
+	test_sign.t \
+	test_version.t
 
 check_PROGRAMS = \
 	$(TESTS)
@@ -72,6 +75,10 @@ test_context_t_LDADD = $(test_ldadd)
 test_sign_t_SOURCES = test/sign.c
 test_sign_t_CPPFLAGS = $(test_cppflags)
 test_sign_t_LDADD = $(test_ldadd)
+
+test_version_t_SOURCES = test/version.c
+test_version_t_CPPFLAGS = $(test_cppflags)
+test_version_t_LDADD = $(test_ldadd)
 
 if WITH_PKG_CONFIG
 pkgconfig_DATA = flux-security.pc
