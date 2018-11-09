@@ -46,7 +46,8 @@ libsecurity_la_SOURCES = \
 
 TESTS = \
 	test_context.t \
-	test_sign.t
+	test_sign.t \
+	test_version.t
 
 check_PROGRAMS = \
 	$(TESTS)
@@ -74,6 +75,10 @@ test_context_t_LDADD = $(test_ldadd)
 test_sign_t_SOURCES = test/sign.c
 test_sign_t_CPPFLAGS = $(test_cppflags)
 test_sign_t_LDADD = $(test_ldadd)
+
+test_version_t_SOURCES = test/version.c
+test_version_t_CPPFLAGS = $(test_cppflags)
+test_version_t_LDADD = $(test_ldadd)
 
 if WITH_PKG_CONFIG
 pkgconfig_DATA = flux-security.pc
