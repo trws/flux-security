@@ -32,31 +32,17 @@
 #include <errno.h>
 
 #include "src/libutil/cf.h"
-#include "src/libutil/hash.h"
+#include "src/libutil/aux.h"
 
 #include "context.h"
 #include "context_private.h"
 
 struct flux_security {
     cf_t *config;
-    hash_t aux;
+    struct aux_item *aux;
     char error[200];
     int errnum;
 };
-
-struct aux_item {
-    void *data;
-    flux_security_free_f free;
-};
-
-static void aux_item_destroy (struct aux_item *item)
-{
-    if (item) {
-        if (item->free)
-            item->free (item->data);
-        free (item);
-    }
-}
 
 /* Capture errno in ctx->errno, and an error message in ctx->error.
  * If 'fmt' is non-NULL, build message; otherwise use strerror (errno).
@@ -88,18 +74,13 @@ flux_security_t *flux_security_create (int flags)
     }
     if (!(ctx = calloc (1, sizeof (*ctx))))
         return NULL;
-    ctx->aux = hash_create (0, (hash_key_f) hash_key_string,
-                               (hash_cmp_f) strcmp,
-                               (hash_del_f) aux_item_destroy);
-
     return ctx;
 }
 
 void flux_security_destroy (flux_security_t *ctx)
 {
     if (ctx) {
-        if (ctx->aux)
-            hash_destroy (ctx->aux);
+        aux_destroy (&ctx->aux);
         cf_destroy (ctx->config);
         free (ctx);
     }
@@ -154,40 +135,32 @@ error:
 int flux_security_aux_set (flux_security_t *ctx, const char *name,
                            void *data, flux_security_free_f freefun)
 {
-    struct aux_item *item;
-
-    if (!ctx || !name || !data) {
+    if (!ctx) {
         errno = EINVAL;
-        security_error (ctx, NULL);
-        return -1;
+        goto error;
     }
-    if (!(item = calloc (1, sizeof (*item)))) {
-        security_error (ctx, NULL);
-        return -1;
-    }
-    item->data = data;
-    item->free = freefun;
-    if (hash_insert (ctx->aux, name, item) == NULL) {
-        security_error (ctx, NULL);
-        free (item);
-        errno = flux_security_last_errnum (ctx);
-        return -1;
-    }
+    if (aux_set (&ctx->aux, name, data, freefun) < 0)
+        goto error;
     return 0;
+error:
+    security_error (ctx, NULL);
+    return -1;
 }
 
 void *flux_security_aux_get (flux_security_t *ctx, const char *name)
 {
-    struct aux_item *item;
+    void *val;
 
-    if (!ctx || !name) {
+    if (!ctx) {
         errno = EINVAL;
-        security_error (ctx, NULL);
-        return NULL;
+        goto error;
     }
-    if (!(item = hash_find (ctx->aux, name)))
-        return NULL;
-    return item->data;
+    if (!(val = aux_get (ctx->aux, name)))
+        goto error;
+    return val;
+error:
+    security_error (ctx, NULL);
+    return NULL;
 }
 
 const cf_t *security_get_config (flux_security_t *ctx, const char *key)
