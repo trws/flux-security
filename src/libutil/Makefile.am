@@ -27,7 +27,9 @@ libutil_la_SOURCES = \
 	timestamp.h \
 	sha256.c \
 	sha256.h \
-	macros.h
+	macros.h \
+	aux.c \
+	aux.h
 
 TESTS = \
 	test_hash.t \
