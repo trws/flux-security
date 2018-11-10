@@ -42,7 +42,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "hash.h"
-#include "thread.h"
+
+/* Disable thread safety */
+#define lsd_mutex_init(mutex)
+#define lsd_mutex_lock(mutex)
+#define lsd_mutex_unlock(mutex)
+#define lsd_mutex_destroy(mutex)
 
 
 /*****************************************************************************
