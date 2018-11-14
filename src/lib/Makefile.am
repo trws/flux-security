@@ -20,7 +20,9 @@ noinst_LTLIBRARIES = \
 
 fluxsecurityinclude_HEADERS = \
 	context.h \
-	sign.h \
+	sign.h
+
+nodist_fluxsecurityinclude_HEADERS = \
 	version.h
 
 libflux_security_la_SOURCES =
