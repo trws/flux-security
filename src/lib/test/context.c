@@ -179,15 +179,14 @@ void test_aux (void)
     ok (flux_security_aux_get (ctx, "bar") == p,
         "flux_security_aux_get retrieves data");
 
-    errno = 0;
-    ok (flux_security_aux_set (ctx, "foo", p, aux_free) < 0 && errno == EEXIST,
-        "flux_security_aux_set key=existing fails with EEXIST");
-    ok (free_flag == 0,
-        "destructor not called");
+    ok (flux_security_aux_set (ctx, "foo", p, aux_free) == 0,
+        "flux_security_aux_set key=existing works");
+    ok (free_flag == 1,
+        "destructor was called");
 
     flux_security_destroy (ctx);
 
-    ok (free_flag == 2,
+    ok (free_flag == 3,
         "flux_security_destroy called aux destructor for each item");
 }
 
