@@ -8,6 +8,7 @@ AM_LDFLAGS = \
 AM_CPPFLAGS = \
 	$(CODE_COVERAGE_CPPFLAGS) \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-I$(top_srcdir)/src
 
 libexec_PROGRAMS = \

@@ -44,6 +44,7 @@ check_LTLIBRARIES = \
 
 test_cppflags = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	$(AM_CPPFLAGS) \
 	$(MUNGE_CFLAGS)
 

@@ -8,6 +8,7 @@ AM_LDFLAGS = \
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-DINSTALLED_CF_PATTERN=\"$(fluxsecuritycfdir)/*.toml\" \
 	$(SODIUM_CFLAGS) $(JANSSON_CFLAGS) $(MUNGE_CFLAGS)
 
