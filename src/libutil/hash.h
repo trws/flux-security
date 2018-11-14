@@ -1,6 +1,6 @@
 /*****************************************************************************
  *  Written by Chris Dunlap <cdunlap@llnl.gov>.
- *  Copyright (C) 2007-2017 Lawrence Livermore National Security, LLC.
+ *  Copyright (C) 2007-2018 Lawrence Livermore National Security, LLC.
  *  Copyright (C) 2002-2007 The Regents of the University of California.
  *  UCRL-CODE-155910.
  *
@@ -23,8 +23,15 @@
  *  You should have received a copy of the GNU General Public License
  *  and GNU Lesser General Public License along with MUNGE.  If not, see
  *  <http://www.gnu.org/licenses/>.
+ *
+ *  Additional permission under GNU GPL version 3 section 7:
+ *
+ *  The licensors of MUNGE grant you additional permission to modify or
+ *  combine with this file and convey/distribute the resulting work under
+ *  the terms of the GNU Lesser General Public License as published by the
+ *  Free Software Foundation, either version 2.1 of the License, or
+ *  (at your option) any later version.
  *****************************************************************************/
-
 
 #ifndef HASH_H
 #define HASH_H

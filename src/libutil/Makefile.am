@@ -15,7 +15,6 @@ noinst_LTLIBRARIES = \
 	libutil.la
 
 libutil_la_SOURCES = \
-	thread.h \
 	hash.c \
 	hash.h \
 	tomltk.c \
