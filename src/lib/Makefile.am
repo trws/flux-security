@@ -8,6 +8,7 @@ AM_LDFLAGS = \
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-DINSTALLED_CF_PATTERN=\"$(fluxsecuritycfdir)/*.toml\" \
 	$(SODIUM_CFLAGS) $(JANSSON_CFLAGS) $(MUNGE_CFLAGS)
 
@@ -19,7 +20,9 @@ noinst_LTLIBRARIES = \
 
 fluxsecurityinclude_HEADERS = \
 	context.h \
-	sign.h \
+	sign.h
+
+nodist_fluxsecurityinclude_HEADERS = \
 	version.h
 
 libflux_security_la_SOURCES =

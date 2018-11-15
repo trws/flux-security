@@ -9,6 +9,7 @@ AM_LDFLAGS = \
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	$(JANSSON_CFLAGS) $(SODIUM_CFLAGS) $(LIBUUID_CFLAGS)
 
 noinst_LTLIBRARIES = \
