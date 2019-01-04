@@ -1,3 +1,13 @@
+/************************************************************\
+ * Copyright 2017 Lawrence Livermore National Security, LLC
+ * (c.f. AUTHORS, NOTICE.LLNS, COPYING)
+ *
+ * This file is part of the Flux resource manager framework.
+ * For details, see https://github.com/flux-framework.
+ *
+ * SPDX-License-Identifier: LGPL-3.0
+\************************************************************/
+
 /* xsign_curve.c - create invalid signatures for curve mechanism
  *
  * Usage: xsign_curve cert testname <input >output
