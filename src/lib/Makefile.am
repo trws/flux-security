@@ -35,6 +35,7 @@ libflux_security_la_LIBADD = \
 
 libflux_security_la_LDFLAGS = \
 	-Wl,--version-script=$(srcdir)/libflux-security.map \
+	-version-info @LIBFLUX_SECURITY_VERSION_INFO@ \
 	-shared -export-dynamic --disable-static
 
 libsecurity_la_SOURCES = \

@@ -32,6 +32,17 @@ AC_SUBST([AX_MINOR_VERSION])
 AC_SUBST([AX_POINT_VERSION])
 
 #
+# Library version
+# https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+LIBFLUX_SECURITY_CURRENT=1
+LIBFLUX_SECURITY_REVISION=0
+LIBFLUX_SECURITY_AGE=0
+AC_SUBST(
+  [LIBFLUX_SECURITY_VERSION_INFO],
+  [$LIBFLUX_SECURITY_CURRENT:$LIBFLUX_SECURITY_REVISION:$LIBFLUX_SECURITY_AGE]
+)
+
+#
 #  Initialize pkg-config for PKG_CHECK_MODULES to avoid conditional issues
 #
 PKG_PROG_PKG_CONFIG
