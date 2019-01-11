@@ -1,3 +1,21 @@
+flux-security version 0.3.0 - 2019-01-11
+----------------------------------------
+
+### Fixes
+
+ * lib: make aux get/set interface like flux-core api (#88)
+
+### New Features
+
+ * license: re-publish project under LGPLv3 (#87, #89, #91)
+ * lib: add interface to query flux-security version (#86)
+ * lib: support library versioning for libflux-security.so (#93)
+
+### Cleanup
+
+ * convert to libsodium base64 implementation (#85)
+
+
 flux-security version 0.2.0 - 2018-08-22
 ----------------------------------------
 
