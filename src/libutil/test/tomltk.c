@@ -93,6 +93,8 @@ void test_json_ts(void)
 
     ok (tomltk_json_to_epoch (obj, &t2) == 0 && t == t2,
         "tomltk_json_to_epoch works, correct value");
+
+    json_decref (obj);
 }
 
 void test_tojson_t1 (void)
