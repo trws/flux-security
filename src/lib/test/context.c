@@ -167,13 +167,15 @@ void aux_free (void *data)
 void test_aux (void)
 {
     flux_security_t *ctx;
-    char *s, *p;
+    char *s, *p, *q;
 
     if (!(ctx = flux_security_create (0)))
         BAIL_OUT ("flux_security_create failed");
     if (!(s = strdup ("hello")))
         BAIL_OUT ("strdup failed");
     if (!(p = strdup ("goodbye")))
+        BAIL_OUT ("strdup failed");
+    if (!(q = strdup ("goodbye, again")))
         BAIL_OUT ("strdup failed");
 
     ok (flux_security_aux_get (ctx, "unknown") == NULL,
@@ -189,7 +191,7 @@ void test_aux (void)
     ok (flux_security_aux_get (ctx, "bar") == p,
         "flux_security_aux_get retrieves data");
 
-    ok (flux_security_aux_set (ctx, "foo", p, aux_free) == 0,
+    ok (flux_security_aux_set (ctx, "foo", q, aux_free) == 0,
         "flux_security_aux_set key=existing works");
     ok (free_flag == 1,
         "destructor was called");
