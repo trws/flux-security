@@ -244,6 +244,7 @@ void test_fread_fwrite (void)
         "new cert is identical to original");
 
     sigcert_destroy (cert);
+    sigcert_destroy (cert2);
 
     cleanup_keypath ("test");
 }
