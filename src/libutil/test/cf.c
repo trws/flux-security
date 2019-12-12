@@ -440,7 +440,7 @@ void test_update_glob (void)
     char path2[PATH_MAX + 1];
     char path3[PATH_MAX + 1];
     char invalid[PATH_MAX + 1];
-    char p [1024];
+    char p [8192];
 
     cf_t *cf;
     const cf_t *cf2, *cf3;
