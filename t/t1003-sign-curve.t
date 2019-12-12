@@ -17,7 +17,7 @@ ca=${SHARNESS_BUILD_DIRECTORY}/t/src/ca
 sign=${SHARNESS_BUILD_DIRECTORY}/t/src/sign
 verify=${SHARNESS_BUILD_DIRECTORY}/t/src/verify
 xsign=${SHARNESS_BUILD_DIRECTORY}/t/src/xsign_curve
-prelib=${SHARNESS_BUILD_DIRECTORY}/t/src/.libs/getpwuid.so
+prelib="${LD_PRELOAD} ${SHARNESS_BUILD_DIRECTORY}/t/src/.libs/getpwuid.so"
 uidlookup=${SHARNESS_BUILD_DIRECTORY}/t/src/uidlookup
 
 export FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/conf.d/*.toml
