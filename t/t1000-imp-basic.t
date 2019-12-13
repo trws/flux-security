@@ -36,15 +36,15 @@ test_expect_success 'Bad IMP config generates error' '
 	grep "loading config: bad.toml: 1: syntax error" bad-config.error
 '
 test_expect_success SUDO 'flux-imp version works under sudo' '
-	sudo $flux_imp version | grep "flux-imp v"
+	$SUDO $flux_imp version | grep "flux-imp v"
 '
 test_expect_success SUDO 'flux-imp fails under sudo if allow-sudo != true' '
 	echo "allow-sudo = false" > nosudo.toml &&
 	test_expect_code 1 \
-	  sudo FLUX_IMP_CONFIG_PATTERN=nosudo.toml $flux_imp version
+	  $SUDO FLUX_IMP_CONFIG_PATTERN=nosudo.toml $flux_imp version
 '
 test_expect_success SUDO 'flux-imp generates error if SUDO_USER is invalid' '
-	test_expect_code 1 sudo SUDO_USER=invalid $flux_imp version
+	test_expect_code 1 $SUDO SUDO_USER=invalid $flux_imp version
 '
 test_expect_success 'flux-imp whoami works' '
 	$flux_imp whoami | sort -k2,2 > output.whoami &&
@@ -55,7 +55,7 @@ EOF
 	test_cmp expected.whoami output.whoami
 '
 test_expect_success SUDO 'flux-imp whoami works under sudo' '
-	sudo $flux_imp whoami | sort -k2,2 > output.whoami.sudo &&
+	$SUDO $flux_imp whoami | sort -k2,2 > output.whoami.sudo &&
 	test_debug cat output.whoami.sudo &&
 	cat <<-EOF > expected.whoami.sudo &&
 	flux-imp: privileged: uid=$(id -ru) euid=0 gid=$(id -rg) egid=0
@@ -68,7 +68,8 @@ test_expect_success SUDO 'create setuid copy of flux-imp for testing' '
 	sudo chmod 4755 ./flux-imp
 '
 test_expect_success SUDO 'setuid copy of flux-imp works' '
-	./flux-imp whoami | sort -k2,2 > output.whoami.setuid &&
+        ASAN_OPTIONS=$ASAN_OPTIONS:detect_leaks=0 \
+	 ./flux-imp whoami | sort -k2,2 > output.whoami.setuid &&
 	test_debug cat output.whoami.setuid &&
 	cat <<-EOF >expected.whoami.setuid &&
 	flux-imp: privileged: uid=$(id -ru) euid=0 gid=$(id -rg) egid=$(id -g)
@@ -77,7 +78,8 @@ test_expect_success SUDO 'setuid copy of flux-imp works' '
 	test_cmp expected.whoami.setuid output.whoami.setuid
 '
 test_expect_success SUDO 'flux-imp setuid ignores SUDO_USER' '
-	SUDO_USER=nobody ./flux-imp whoami | sort -k2,2 > output.whoami.no &&
+        ASAN_OPTIONS=$ASAN_OPTIONS:detect_leaks=0 \
+	 SUDO_USER=nobody ./flux-imp whoami | sort -k2,2 > output.whoami.no &&
 	test_debug cat output.whoami.no &&
 	cat <<-EOF >expected.whoami.no &&
 	flux-imp: privileged: uid=$(id -ru) euid=0 gid=$(id -rg) egid=$(id -g)
