@@ -160,6 +160,8 @@ static void test_privsep_kv (void)
         "privsep_write_kv");
 
     ok (privsep_destroy (ps) == 0, "privsep child exited normally");
+
+    kv_destroy (kv);
 }
 
 static void child_write_ints (privsep_t *ps, void *arg)
