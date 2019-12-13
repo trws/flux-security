@@ -11,6 +11,8 @@ matrix:
       env: COVERAGE=t ARGS="--enable-code-coverage" MAKECMDS="make && make check-code-coverage && lcov -l flux*-coverage.info"
     - compiler: clang-6.0
       env: CC=clang-6.0
+    - compiler: gcc-8
+      env: ARGS="--enable-sanitizers" MAKECMDS="make check"
 
 addons:
   apt:
