@@ -1,27 +1,22 @@
 language: c
 sudo: true
+dist: bionic
 
 matrix:
   include:
-    - compiler: gcc
+    - compiler: gcc-8
       env: MAKECMDS="make && make distcheck"
     - compiler: clang
-    - compiler: gcc-5
-      env: CC=gcc-5 COVERAGE=t ARGS="--enable-code-coverage" MAKECMDS="make && make check-code-coverage && lcov -l flux*-coverage.info"
-    - compiler: gcc-7
-      env: CC=gcc-7
-    - compiler: clang-4.0
-      env: CC=clang-4.0
+    - compiler: gcc
+      env: COVERAGE=t ARGS="--enable-code-coverage" MAKECMDS="make && make check-code-coverage && lcov -l flux*-coverage.info"
+    - compiler: clang-6.0
+      env: CC=clang-6.0
 
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
-      - llvm-toolchain-trusty-4.0
     packages:
-      - gcc-5
-      - gcc-7
-      - clang-4.0
+      - gcc-8
+      - clang-6.0
       - lcov
       - libjansson-dev
 
