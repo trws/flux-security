@@ -37,7 +37,8 @@ check_PROGRAMS = \
 	src/verify \
 	src/xsign_munge \
 	src/xsign_curve \
-	src/uidlookup
+	src/uidlookup \
+	src/sanitizers-enabled
 
 check_LTLIBRARIES = \
 	src/getpwuid.la

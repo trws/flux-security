@@ -81,7 +81,8 @@ int main (int argc, char **argv)
                           &userid, 0) < 0)
         die ("flux_sign_unwrap: %s", flux_security_last_error (ctx));
 
-    fwrite (payload, payloadsz, 1, stdout);
+    if (payload)
+        fwrite (payload, payloadsz, 1, stdout);
     if (ferror (stdout))
         die ("write stdout failed");
 

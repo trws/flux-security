@@ -48,6 +48,23 @@ AC_SUBST(
 PKG_PROG_PKG_CONFIG
 
 #
+#  If --enable-sanitizers add selected -fsanitize flags to build
+#
+AC_MSG_CHECKING([whether to enable sanitizers])
+AC_ARG_ENABLE([sanitizers],
+              AS_HELP_STRING([--enable-sanitizers], [add {L,A,UB}San to build]),
+[
+AC_MSG_RESULT($withval)
+CFLAGS="$CFLAGS -fsanitize=address -fsanitize=undefined -fsanitize-recover=all"
+CFLAGS="$CFLAGS -g -fno-omit-frame-pointer"
+LDFLAGS="$LDFLAGS -fsanitize=address -fsanitize=undefined"
+AC_DEFINE([SANITIZERS_ENABLED], 1,
+          [Define to 1 if flux-security was compiled with --enable-sanitizers])
+],
+[AC_MSG_RESULT(no)])
+AM_CONDITIONAL([SANITIZERS_ENABLED], [test "x$enable_sanitizers" != "xno" ])
+
+#
 #  Checks for programs
 #
 AC_PROG_CC_C99

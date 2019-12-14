@@ -1,3 +1,9 @@
+if SANITIZERS_ENABLED
+ASAN_OPTIONS  ?= verify_asan_link_order=0:check_initialization_order=1:detect_stack_use_after_return=1:detect_invalid_pointer_pairs=1:strict_string_checks=1
+UBSAN_OPTIONS ?= print_stacktrace=1
+export ASAN_OPTIONS
+export UBSAN_OPTIONS
+endif
 SUBDIRS =         src etc t
 ACLOCAL_AMFLAGS = -I config
 EXTRA_DIST = \

@@ -60,7 +60,8 @@ void cf_init (void)
 
 void cf_fini (void)
 {
-    char path[PATH_MAX + 1];
+    /* path requires room for PATH_MAX + format size */
+    char path[PATH_MAX + 16];
 
     (void)snprintf (path, sizeof (path), "%s/ca-cert", tmpdir);
     (void)unlink (path);
@@ -81,7 +82,7 @@ void test_basic (void)
     int64_t userid;
     int64_t ttl;
     const char *uuid;
-    char path[PATH_MAX + 1];
+    char path[PATH_MAX*2 + 1];
     int64_t i;
     const char *s;
     time_t t, ctime, not_valid_before_time;
@@ -182,7 +183,6 @@ void test_basic (void)
     ok (ca_verify (ca, badcert, NULL, NULL, e) < 0 && errno == EINVAL,
         "ca_verify fails with EINVAL");
     diag ("%s", e);
-    sigcert_destroy (badcert);
 
     /* Revoke cert
      */
@@ -194,6 +194,7 @@ void test_basic (void)
     ok (ca_verify (ca, badcert, NULL, NULL, e) < 0 && errno == EINVAL,
         "ca_verify fails with EINVAL");
     diag ("%s", e);
+    sigcert_destroy (badcert);
 
     /* clean up revocation dir */
     snprintf (path, sizeof (path), "%s/ca-revoke/%s", tmpdir, uuid);

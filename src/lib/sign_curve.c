@@ -121,6 +121,7 @@ static struct sigcert *header_get_cert (const struct kv *header,
         goto error;
     if (!(cert = sigcert_decode (buf, len)))
         goto error;
+    kv_destroy (kv);
     return cert;
 error:
     kv_destroy (kv);
@@ -319,6 +320,7 @@ static int op_verify (flux_security_t *ctx, const struct kv *header,
         security_error (ctx, "sign-curve-verify: ctime is in the future");
         goto error_nomsg;
     }
+    sigcert_destroy (cert);
     return 0;
 error:
     security_error (ctx, NULL);

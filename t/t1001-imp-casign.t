@@ -59,7 +59,7 @@ test_expect_success 'create new user signing cert' '
 '
 
 test_expect_success SUDO 'imp casign works under sudo' '
-	sudo FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/conf.d/*.toml \
+	$SUDO FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/conf.d/*.toml \
 		$flux_imp casign <u.pub >u.pub.signed.sudo
 '
 

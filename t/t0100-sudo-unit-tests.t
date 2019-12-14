@@ -16,6 +16,6 @@ test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 basedir=${SHARNESS_BUILD_DIRECTORY}/src
 
 test_expect_success SUDO 'privsep unit tests' '
-	sudo $basedir/imp/test_privsep.t
+	$SUDO $basedir/imp/test_privsep.t
 '
 test_done

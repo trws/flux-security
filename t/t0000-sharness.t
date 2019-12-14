@@ -19,6 +19,8 @@
 
 test_description='Test Sharness itself'
 
+# Append --logfile option if FLUX_TESTS_LOGFILE is set in environment:
+test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 . `dirname $0`/sharness.sh
 
 ret="$?"
