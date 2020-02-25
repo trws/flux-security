@@ -16,8 +16,8 @@ test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 # in sharness.d/03-munge.sh.  If that doesn't work, skip the whole test.
 if munge </dev/null | unmunge >/dev/null; then
 	echo "System munge works"
-	export MUNGE_SOCKET=$(munged --help | grep socket \
-					    | sed 's/.*\[\(.*\)\]$/\1/')
+	export MUNGE_SOCKET=$(munged --help \
+	                      | sed -n '/-S, --socket/s/.*\[\(.*\)\]$/\1/p')
 elif munged --version; then
 	test_set_prereq SIDEMUNGE
 	export MUNGED=munged  # needed by 03-munge.sh
