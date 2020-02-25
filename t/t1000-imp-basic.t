@@ -63,11 +63,18 @@ test_expect_success SUDO 'flux-imp whoami works under sudo' '
 EOF
 	test_cmp expected.whoami.sudo output.whoami.sudo
 '
-test_expect_success SUDO 'create setuid copy of flux-imp for testing' '
+test_expect_success SUDO 'attempt to create setuid copy of flux-imp for testing' '
 	sudo cp $flux_imp . &&
 	sudo chmod 4755 ./flux-imp
 '
-test_expect_success SUDO 'setuid copy of flux-imp works' '
+
+#  In case tests are running on filesystem with nosuid, check that permissions
+#   of flux-imp are actually setuid, and if so set SUID_ENABLED prereq
+#
+test -n "$(find ./flux-imp -perm 4755)" && test_set_prereq SUID_ENABLED
+
+
+test_expect_success SUID_ENABLED 'setuid copy of flux-imp works' '
         ASAN_OPTIONS=$ASAN_OPTIONS:detect_leaks=0 \
 	 ./flux-imp whoami | sort -k2,2 > output.whoami.setuid &&
 	test_debug cat output.whoami.setuid &&
@@ -77,7 +84,7 @@ test_expect_success SUDO 'setuid copy of flux-imp works' '
 	EOF
 	test_cmp expected.whoami.setuid output.whoami.setuid
 '
-test_expect_success SUDO 'flux-imp setuid ignores SUDO_USER' '
+test_expect_success SUID_ENABLED 'flux-imp setuid ignores SUDO_USER' '
         ASAN_OPTIONS=$ASAN_OPTIONS:detect_leaks=0 \
 	 SUDO_USER=nobody ./flux-imp whoami | sort -k2,2 > output.whoami.no &&
 	test_debug cat output.whoami.no &&
