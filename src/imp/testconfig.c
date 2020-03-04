@@ -13,7 +13,7 @@
 #include "testconfig.h"
 
 /*
- *  For build-tree/test IMP only! Return config patter from environment
+ *  For build-tree/test IMP only! Return config pattern from environment
  *   if set, otherwise use built-in "test" configuration pattern, which
  *   will point to src/imp/imp.conf.d
  */
