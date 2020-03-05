@@ -42,7 +42,10 @@ flux_imp_SOURCES = \
 	testconfig.c \
 	casign.c \
 	passwd.c \
-	passwd.h
+	passwd.h \
+	exec/user.h \
+	exec/user.c \
+	exec/exec.c
 
 testconfig.o: testconfig.h
 testconfig.h: $(top_builddir)/config/config.h
