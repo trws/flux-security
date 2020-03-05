@@ -82,9 +82,17 @@ BUILT_SOURCES = \
 #  Installed flux-imp configuration pattern is locked down to
 #   the system path for security reasons.
 config.c:
-	@(echo "const char *imp_get_config_pattern (void)"; \
-          echo "{"; \
-          echo "    return \"$(fluxsecuritycfdir)/*.toml\";"; \
+	@(echo "#include <stdlib.h>"; \
+	  echo ; \
+	  echo "const char *imp_get_security_config_pattern (void)"; \
+	  echo "{"; \
+	  echo "    /* Always use built-in config path */"; \
+	  echo "    return NULL;"; \
+	  echo "}"; \
+	  echo ; \
+	  echo "const char *imp_get_config_pattern (void)"; \
+	  echo "{"; \
+	  echo "    return \"$(fluximpcfdir)/*.toml\";"; \
 	  echo "}"; \
 	)> config.c
 

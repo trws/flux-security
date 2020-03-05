@@ -59,13 +59,14 @@ struct imp_exec {
     int specsz;
 };
 
-extern const char *imp_get_config_pattern (void);
+extern const char *imp_get_security_config_pattern (void);
 
 static flux_security_t *sec_init (void)
 {
     flux_security_t *sec = flux_security_create (0);
+    const char *conf_pattern = imp_get_security_config_pattern ();
 
-    if (!sec || flux_security_configure (sec, imp_get_config_pattern ()) < 0) {
+    if (!sec || flux_security_configure (sec, conf_pattern) < 0) {
         imp_die (1, "exec: Error loading security context: %s",
                     sec ? flux_security_last_error (sec) : strerror (errno));
     }

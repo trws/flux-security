@@ -126,6 +126,9 @@ AC_SUBST(fluxsecuritycfdir)
 AS_VAR_SET(fluxsecurityincludedir, $includedir/flux/security)
 AC_SUBST(fluxsecurityincludedir)
 
+AS_VAR_SET(fluximpcfdir, $sysconfdir/flux/imp/conf.d)
+AC_SUBST(fluximpcfdir)
+
 #
 #  Epilogue
 #

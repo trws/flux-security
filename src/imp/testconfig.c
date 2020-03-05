@@ -25,6 +25,16 @@ const char * imp_get_config_pattern (void)
     return (p);
 }
 
+/*  For build-tree/test IMP, return the same config path for
+ *   libflux-security as flux-imp. This is what the tests expect
+ *   and makes test writing easier (only one env var needed to
+ *   override config)
+ */
+const char * imp_get_security_config_pattern (void)
+{
+    return imp_get_config_pattern ();
+}
+
 /*
  *  vi: ts=4 sw=4 expandtab
  */
