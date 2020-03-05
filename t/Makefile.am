@@ -12,7 +12,7 @@ TEST_EXTENSIONS = .t
 T_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 	$(top_srcdir)/config/tap-driver.sh
 
-TESTS = \
+TESTSCRIPTS = \
 	t0000-sharness.t \
 	t0100-sudo-unit-tests.t \
 	t1000-imp-basic.t \
@@ -20,13 +20,8 @@ TESTS = \
 	t1002-sign-munge.t \
 	t1003-sign-curve.t
 
-check_SCRIPTS = \
-	t0000-sharness.t \
-	t0100-sudo-unit-tests.t \
-	t1000-imp-basic.t \
-	t1001-imp-casign.t \
-	t1002-sign-munge.t \
-	t1003-sign-curve.t
+TESTS = \
+	$(TESTSCRIPTS)
 
 check_PROGRAMS = \
 	src/keygen \
