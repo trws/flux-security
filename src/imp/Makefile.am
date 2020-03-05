@@ -15,9 +15,14 @@ libexec_PROGRAMS = \
 	flux-imp
 
 flux_imp_LDADD = \
+	$(top_builddir)/src/lib/libflux-security.la \
 	$(top_builddir)/src/libca/libca.la \
 	$(top_builddir)/src/libutil/libutil.la \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la
+
+flux_imp_LDFLAGS = \
+	-static
+
 
 flux_imp_SOURCES = \
 	imp.c \
