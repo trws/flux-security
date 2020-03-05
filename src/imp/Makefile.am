@@ -10,8 +10,15 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-I$(top_builddir) \
 	-I$(top_srcdir)/src
-
+#
+#  Create two versions of flux-imp, one that will be used for testing
+#   flux-imp, and one that will be installed inst/flux-imp.
+#  The only difference is that the test version allows configuration
+#   pattern to be overridden for in-tree testing purposes.
+#
 libexec_PROGRAMS = \
+	inst/flux-imp
+noinst_PROGRAMS = \
 	flux-imp
 
 flux_imp_LDADD = \
@@ -20,11 +27,18 @@ flux_imp_LDADD = \
 	$(top_builddir)/src/libutil/libutil.la \
 	$(top_builddir)/src/libtomlc99/libtomlc99.la
 
+#
+#  Build the test-only version of flux-imp with -static, which seems
+#   to cause libtool to avoid creating a wrapper script (libtool's
+#   wrapper script is not compatible with setuid flux-imp tests). However,
+#   this embeds the builddir path to libflux-security into the DT_RUNPATH
+#   of the resulting executable, so DO NOT use this for the installed
+#   copy of the IMP (inst/flux-imp):
+#
 flux_imp_LDFLAGS = \
 	-static
 
-
-flux_imp_SOURCES = \
+IMP_SOURCES = \
 	imp.c \
 	imp_state.h \
 	imp_log.h \
@@ -38,8 +52,6 @@ flux_imp_SOURCES = \
 	sudosim.h \
 	version.c \
 	whoami.c \
-	testconfig.h \
-	testconfig.c \
 	casign.c \
 	passwd.c \
 	passwd.h \
@@ -47,14 +59,45 @@ flux_imp_SOURCES = \
 	exec/user.c \
 	exec/exec.c
 
-testconfig.o: testconfig.h
+flux_imp_SOURCES = \
+	testconfig.c \
+	$(IMP_SOURCES)
+
+nodist_flux_imp_SOURCES = \
+	testconfig.h
+
+inst_flux_imp_SOURCES = \
+	$(IMP_SOURCES)
+
+nodist_inst_flux_imp_SOURCES = \
+	config.c
+
+inst_flux_imp_LDADD = \
+	$(flux_imp_LDADD)
+
+BUILT_SOURCES = \
+	config.c \
+	testconfig.h
+
+#  Installed flux-imp configuration pattern is locked down to
+#   the system path for security reasons.
+config.c:
+	@(echo "const char *imp_get_config_pattern (void)"; \
+          echo "{"; \
+          echo "    return \"$(fluxsecuritycfdir)/*.toml\";"; \
+	  echo "}"; \
+	)> config.c
+
+#  Test version of flux-imp gets builddir config pattern by default,
+#   and allows override via FLUX_IMP_CONFIG_PATTERN (see testconfig.c).
 testconfig.h: $(top_builddir)/config/config.h
 	@(confdir=`cd $(srcdir) && pwd`/imp.conf.d; \
 	  echo "const char *imp_config_pattern = \"$$confdir/*.toml\";" \
 	 )> testconfig.h
 
 MOSTLYCLEANFILES = \
-	testconfig.h
+	testconfig.h \
+	config.c
 
 EXTRA_DIST = \
 	imp.conf.d
