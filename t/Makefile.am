@@ -18,9 +18,13 @@ TESTSCRIPTS = \
 	t1000-imp-basic.t \
 	t1001-imp-casign.t \
 	t1002-sign-munge.t \
-	t1003-sign-curve.t
+	t1003-sign-curve.t \
+	t2000-imp-exec.t
 
 TESTS = \
+	$(TESTSCRIPTS)
+
+check_SCRIPTS = \
 	$(TESTSCRIPTS)
 
 check_PROGRAMS = \
