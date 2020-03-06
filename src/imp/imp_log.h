@@ -27,7 +27,8 @@ void imp_warn (const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void imp_debug (const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 /*  Print an error to IMP logging destination and exit with exit `code` */
-void imp_die (int code, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
+void __attribute__((noreturn)) imp_die (int code, const char *fmt, ...)
+     __attribute__ ((format (printf, 2, 3)));
 
 /*
  *  Logging output provider prototype:
