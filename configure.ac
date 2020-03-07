@@ -120,7 +120,7 @@ AC_PKGCONFIG
 AS_VAR_SET(fluxlibdir, $libdir/flux)
 AC_SUBST(fluxlibdir)
 
-AS_VAR_SET(fluxlibexecdir, $libexec/flux)
+AS_VAR_SET(fluxlibexecdir, $libexecdir/flux)
 AC_SUBST(fluxlibexecdir)
 
 AS_VAR_SET(fluxsecuritycfdir, $sysconfdir/flux/security/conf.d)

@@ -16,7 +16,7 @@ AM_CPPFLAGS = \
 #  The only difference is that the test version allows configuration
 #   pattern to be overridden for in-tree testing purposes.
 #
-libexec_PROGRAMS = \
+fluxlibexec_PROGRAMS = \
 	inst/flux-imp
 noinst_PROGRAMS = \
 	flux-imp
