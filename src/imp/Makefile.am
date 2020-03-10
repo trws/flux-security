@@ -54,7 +54,8 @@ EXTRA_DIST = \
 TESTS = \
 	test_imp_log.t \
 	test_privsep.t \
-	test_impcmd.t
+	test_impcmd.t \
+	test_passwd.t
 
 check_PROGRAMS = \
 	$(TESTS)
@@ -91,3 +92,10 @@ test_impcmd_t_SOURCES =  \
 	impcmd.h
 
 test_impcmd_t_LDADD = $(test_ldadd)
+
+test_passwd_t_SOURCES =  \
+	test/passwd.c \
+	passwd.c \
+	passwd.h
+
+test_passwd_t_LDADD = $(test_ldadd)
