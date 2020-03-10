@@ -96,7 +96,8 @@ static void test_privsep_basic (void)
     ok (geteuid() == 0,
         "parent retains effective uid == 0");
 
-    ok (privsep_destroy (ps) == 0, "privsep child exited normally");
+    ok (privsep_wait (ps) == 0, "privsep child exited normally");
+    privsep_destroy (ps);
 }
 
 static void child_kv_test (privsep_t *ps, void *arg __attribute__ ((unused)))
@@ -159,8 +160,9 @@ static void test_privsep_kv (void)
     ok (privsep_write_kv (ps, kv) >= 0,
         "privsep_write_kv");
 
-    ok (privsep_destroy (ps) == 0, "privsep child exited normally");
+    ok (privsep_wait (ps) == 0, "privsep child exited normally");
 
+    privsep_destroy (ps);
     kv_destroy (kv);
 }
 

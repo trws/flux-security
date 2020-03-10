@@ -213,8 +213,8 @@ int imp_exec_privileged (struct imp_state *imp, struct kv *kv)
         imp_die (1, "exec: shell not in allowed-shells list");
 
     /* Ensure child exited with nonzero status */
-    if (privsep_destroy (imp->ps) < 0)
-        imp_die (1, "exec: error in unpriv imp child");
+    if (privsep_wait (imp->ps) < 0)
+        exit (1);
 
     /* Call privileged IMP plugins/containment */
 

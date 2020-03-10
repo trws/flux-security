@@ -43,6 +43,7 @@ static void imp_parent (struct imp_state *imp);
 
 int main (int argc, char *argv[])
 {
+    int exit_code = 0;
     struct imp_state imp;
 
     initialize_logging ();
@@ -73,20 +74,23 @@ int main (int argc, char *argv[])
          */
         if (!(imp.ps = privsep_init (imp_child, &imp)))
             imp_die (1, "Privilege separation initialization failed");
+
         imp_parent (&imp);
 
-        /* Parent returns.. */
-        if (privsep_destroy (imp.ps) < 0)
-            imp_warn ("privsep_destroy: %s", strerror (errno));
+        /*  Wait for child to exit. Exit with failure if child did so.
+         */
+        if (privsep_wait (imp.ps) < 0)
+            exit_code = 1;
     }
     else {
         /*  Not running with privilege, run child half of function only */
         imp_child (NULL, &imp);
     }
 
+    privsep_destroy (imp.ps);
     cf_destroy (imp.conf);
     imp_closelog ();
-    exit (0);
+    exit (exit_code);
 }
 
 static int log_stderr (int level, const char *str,
