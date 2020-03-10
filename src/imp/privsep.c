@@ -144,6 +144,8 @@ privsep_t * privsep_init (privsep_child_f fn, void *arg)
         return (NULL);
     }
     ps->ppid = getpid ();
+    ps->wfd = -1;
+    ps->rfd = -1;
 
     if (pipe (ps->upfds) < 0 || pipe (ps->ppfds) < 0) {
         imp_warn ("privsep_init: pipe: %s\n", strerror (errno));
@@ -181,9 +183,9 @@ int privsep_wait (privsep_t *ps)
 void privsep_destroy (privsep_t *ps)
 {
     if (ps) {
-        if (ps->wfd > 0)
+        if (ps->wfd >= 0)
             close (ps->wfd);
-        if (ps->rfd > 0)
+        if (ps->rfd >= 0)
             close (ps->rfd);
         free (ps);
     }
