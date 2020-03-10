@@ -193,6 +193,23 @@ int cf_array_size (const cf_t *cf)
     return cf ? json_array_size (cf) : 0;
 }
 
+/*  Return true if 'str' appears in cf array 'cf'
+ *  False if array is NULL or is zero length, or doesn't contain str
+ */
+bool cf_array_contains (const cf_t *cf, const char *str)
+{
+    int size;
+    if (str && cf && (size = cf_array_size (cf)) > 0) {
+        for (int i = 0; i < size; i++) {
+            const cf_t *entry = cf_get_at (cf, i);
+            if (cf_typeof (entry) == CF_STRING
+                && strcmp (cf_string (entry), str) == 0)
+                return true;
+        }
+    }
+    return false;
+}
+
 /* Parse some TOML and merge it with 'cf' object.
  * If filename is non-NULL, take TOML from file, o/w use buf, len.
  */

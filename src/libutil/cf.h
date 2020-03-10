@@ -92,6 +92,11 @@ time_t cf_timestamp (const cf_t *cf);     // default: 0
  */
 int cf_array_size (const cf_t *cf);
 
+/* Return true if array contains string str.
+ * Return false if cf is NULL, is not an array, or doesn't contain str.
+ */
+bool cf_array_contains (const cf_t *cf, const char *str);
+
 /* Update table 'cf' with info parsed from TOML 'buf' or 'filename'.
  * On success return 0.  On failure, return -1 with errno set.
  * If error is non-NULL, write error description there.

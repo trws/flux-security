@@ -144,6 +144,8 @@ privsep_t * privsep_init (privsep_child_f fn, void *arg)
         return (NULL);
     }
     ps->ppid = getpid ();
+    ps->wfd = -1;
+    ps->rfd = -1;
 
     if (pipe (ps->upfds) < 0 || pipe (ps->ppfds) < 0) {
         imp_warn ("privsep_init: pipe: %s\n", strerror (errno));
@@ -164,26 +166,29 @@ privsep_t * privsep_init (privsep_child_f fn, void *arg)
     return (ps);
 }
 
-int privsep_destroy (privsep_t *ps)
+int privsep_wait (privsep_t *ps)
 {
     int status = 0;
-
-    if (ps->wfd > 0)
-        close (ps->wfd);
-    if (ps->rfd > 0)
-        close (ps->rfd);
-
     if (privsep_is_parent (ps)) {
         if (ps->cpid > (pid_t) 0) {
-            int status;
             kill (SIGTERM, ps->cpid);
             if (waitpid (ps->cpid, &status, 0) < 0)
                 status = -1;
+            ps->cpid = (pid_t) -1;
         }
     }
-
-    free (ps);
     return (status == 0 ? 0 : -1);
+}
+
+void privsep_destroy (privsep_t *ps)
+{
+    if (ps) {
+        if (ps->wfd >= 0)
+            close (ps->wfd);
+        if (ps->rfd >= 0)
+            close (ps->rfd);
+        free (ps);
+    }
 }
 
 bool privsep_is_parent (privsep_t *ps)

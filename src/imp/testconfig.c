@@ -13,7 +13,7 @@
 #include "testconfig.h"
 
 /*
- *  For build-tree/test IMP only! Return config patter from environment
+ *  For build-tree/test IMP only! Return config pattern from environment
  *   if set, otherwise use built-in "test" configuration pattern, which
  *   will point to src/imp/imp.conf.d
  */
@@ -23,6 +23,16 @@ const char * imp_get_config_pattern (void)
     if (p == NULL)
          p = imp_config_pattern; /* From testconfig.h */
     return (p);
+}
+
+/*  For build-tree/test IMP, return the same config path for
+ *   libflux-security as flux-imp. This is what the tests expect
+ *   and makes test writing easier (only one env var needed to
+ *   override config)
+ */
+const char * imp_get_security_config_pattern (void)
+{
+    return imp_get_config_pattern ();
 }
 
 /*

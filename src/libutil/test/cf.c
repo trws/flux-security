@@ -45,6 +45,7 @@ const char *tab3 = \
 "[tab3]\n" \
 "id = 3\n";
 
+
 const struct cf_option opts[] = {
     { "i", CF_INT64, true },
     { "d", CF_DOUBLE, true },
@@ -569,6 +570,62 @@ void test_check (void)
     cf_destroy (cf);
 }
 
+void test_array_contains (void)
+{
+    const char *array1 = "array = [ \"foo\", \"bar\", \"baz\" ]";
+    const char *array2 = "array2 = [ 1, 2, 3 ]";
+    cf_t *tab;
+    const cf_t *cf;
+
+    if (!(tab = cf_create ()))
+        BAIL_OUT ("cf_create");
+    if (cf_update (tab, array1, strlen (array1), NULL) < 0)
+        BAIL_OUT ("cf_update");
+    if (cf_update (tab, array2, strlen (array2), NULL) < 0)
+        BAIL_OUT ("cf_update");
+
+    cf = cf_get_in (tab, "array");
+
+    ok (cf_typeof (cf) == CF_ARRAY,
+        "cf_update of an array worked");
+    ok (cf_array_size (cf) == 3,
+        "array has expected number of elements");
+
+    ok (cf_array_contains (NULL, NULL) == false,
+        "cf_array_contains (NULL, NULL) returns false");
+    ok (cf_array_contains (NULL, "foo") == false,
+        "cf_array_contains (NULL, \"foo\") returns false");
+    ok (cf_array_contains (cf, NULL) == false,
+        "cf_array_contains (cf, NULL) returns false");
+    ok (cf_array_contains (cf, "") == false,
+        "cf_array_contains (cf, \"\") returns false");
+    ok (cf_array_contains (cf, "buzz") == false,
+        "cf_array_contains (cf, \"buzz\") returns false");
+    ok (cf_array_contains (cf, "foob") == false,
+        "cf_array_contains (cf, \"foob\") returns false");
+    ok (cf_array_contains (cf, "foo"),
+        "cf_array_contains (cf, \"foo\") returns true");
+    ok (cf_array_contains (cf, "bar"),
+        "cf_array_contains (cf, \"bar\") returns true");
+    ok (cf_array_contains (cf, "baz"),
+        "cf_array_contains (cf, \"baz\") returns true");
+
+
+    cf = cf_get_in (tab, "array2");
+
+    ok (cf_typeof (cf) == CF_ARRAY,
+        "cf_update of array2 worked");
+    ok (cf_array_size (cf) == 3,
+        "array2 has expected number of elements");
+    ok (cf_array_contains (cf, "") == false,
+        "cf_array_contains returns false for non-string array");
+    ok (cf_array_contains (cf, "foo") == false,
+        "cf_array_contains returns false for non-string array");
+
+    cf_destroy (tab);
+}
+
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -579,6 +636,7 @@ int main (int argc, char *argv[])
     test_update_file ();
     test_update_glob ();
     test_check ();
+    test_array_contains ();
 
     done_testing ();
 }

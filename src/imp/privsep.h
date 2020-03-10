@@ -28,11 +28,15 @@ typedef void (*privsep_child_f) (privsep_t *ps, void *arg);
  */
 privsep_t * privsep_init (privsep_child_f fn, void *arg);
 
+/*  If this is the parent process, wait for child to exit.
+ *  Returns 0 if child exited normally, -1 if not.
+ */
+int privsep_wait (privsep_t *ps);
+
 /*  Free memory associated with privsep handle and close associated
- *   file descriptors to parent/child. If this is the parent process,
- *   it will wait for the child to exit.
+ *   file descriptors to parent/child.
  */  
-int privsep_destroy (privsep_t *ps);
+void privsep_destroy (privsep_t *ps);
 
 /*  Return true if running in child.
  */
