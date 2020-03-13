@@ -233,18 +233,19 @@ static int signature_cat (const char *sig, void **buf, int *bufsz)
     return 0;
 }
 
-const char *flux_sign_wrap (flux_security_t *ctx,
-                            const void *pay, int paysz,
-                            const char *mech_type, int flags)
+const char *flux_sign_wrap_as (flux_security_t *ctx,
+                               int64_t userid,
+                               const void *pay, int paysz,
+                               const char *mech_type, int flags)
 {
     struct sign *sign;
     struct kv *header = NULL;
     char *sig = NULL;
     const struct sign_mech *mech;
-    int64_t userid = getuid (); // real user id
     int saved_errno;
 
-    if (!ctx || flags != 0 || paysz < 0 || (paysz > 0 && pay == NULL)) {
+    if (!ctx || userid < 0 || flags != 0
+        || paysz < 0 || (paysz > 0 && pay == NULL)) {
         errno = EINVAL;
         security_error (ctx, NULL);
         return NULL;
@@ -301,6 +302,13 @@ error_msg:
     free (sig);
     errno = saved_errno;
     return NULL;
+}
+
+const char *flux_sign_wrap (flux_security_t *ctx,
+                            const void *pay, int paysz,
+                            const char *mech_type, int flags)
+{
+    return flux_sign_wrap_as (ctx, getuid(), pay, paysz, mech_type, flags);
 }
 
 /* Decode HEADER portion of HEADER.PAYLOAD.SIGNATURE
