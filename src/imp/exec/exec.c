@@ -85,6 +85,11 @@ static bool imp_exec_shell_allowed (struct imp_exec *exec)
                               exec->shell);
 }
 
+static bool imp_exec_unprivileged_allowed (struct imp_exec *exec)
+{
+    return cf_bool (cf_get_in (exec->conf, "allow-unprivileged-exec"));
+}
+
 static void imp_exec_destroy (struct imp_exec *exec)
 {
     if (exec) {
@@ -270,8 +275,11 @@ int imp_exec_unprivileged (struct imp_state *imp, struct kv *kv)
         exit (0);
     }
 
-    /* Not in privilege separation mode, issue warning and process input
-     *  for testing purposes
+    if (!imp_exec_unprivileged_allowed (exec))
+        imp_die (1, "exec: IMP not installed setuid, operation disabled.");
+
+    /* Unprivileged exec allowed. Issue warning and process input for
+     *  testing purposes.
      */
     imp_warn ("Running without privilege, userid switching not available");
 
