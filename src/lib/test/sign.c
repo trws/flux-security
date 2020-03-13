@@ -243,6 +243,32 @@ void test_basic (flux_security_t *ctx)
         "returned payload=NULL");
     ok (outmsgsz == 0,
         "returned payloadsz=NULL");
+
+    /* Sign-as
+     */
+    s = flux_sign_wrap_as (ctx, 42, inmsg, inmsgsz, NULL, 0);
+    ok (s != NULL,
+        "flux_sign_wrap_as works");
+    diag ("%s", s);
+
+    /* Unwrap no verify
+     */
+    outmsgsz = 0;
+    outmsg = NULL;
+    ok (flux_sign_unwrap (ctx, s, (const void **)&outmsg,
+                          &outmsgsz, &userid, FLUX_SIGN_NOVERIFY) == 0,
+        "flux_sign_unwrap NOVERIFY works with flux_sign_wrap_as()");
+    ok (outmsgsz == inmsgsz,
+        "unwrapped size matches wrapped size");
+    ok (outmsg != NULL && memcmp (outmsg, inmsg, inmsgsz) == 0,
+        "unwrapped message matches wrapped message");
+    ok (userid == 42,
+        "userid matches argument to flux_sign_wrap_as()");
+
+    ok (flux_sign_unwrap (ctx, s, (const void **)&outmsg,
+                          &outmsgsz, &userid, 0) < 0,
+        "flux_sign_unwrap VERIFY fails with flux_sign_wrap_as()");
+    diag ("%s", flux_security_last_error (ctx));
 }
 
 void test_mechselect (flux_security_t *ctx)
@@ -513,6 +539,11 @@ void test_corner (flux_security_t *ctx)
     ok (flux_sign_unwrap (ctx, cpy, NULL, NULL, NULL, 0xff) < 0
         && errno == EINVAL,
         "flux_sign_unwrap flags=0xff fails with EINVAL");
+
+    errno = 0;
+    ok (flux_sign_wrap_as (ctx, -1, "foo", 3, NULL, 0) == NULL
+        && errno == EINVAL,
+        "flux_sign_unwrap_as userid=-1 fails with EINVAL");
 
     free (cpy);
 }
