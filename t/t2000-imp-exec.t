@@ -47,6 +47,7 @@ test_expect_success 'create configs for flux-imp exec and signer' '
 	[exec]
 	allowed-users = [ "$(whoami)" ]
 	allowed-shells = [ "id", "echo" ]
+	allow-unprivileged-exec = true
 	EOF
 	cat <<-EOF >sign-none-allowed-munge.toml
 	allow-sudo = true
@@ -57,6 +58,7 @@ test_expect_success 'create configs for flux-imp exec and signer' '
 	[exec]
 	allowed-users = [ "$(whoami)" ]
 	allowed-shells = [ "id", "echo" ]
+	allow-unprivileged-exec = true
 	EOF
 '
 test_expect_success 'flux-imp exec works in unprivileged mode' '
