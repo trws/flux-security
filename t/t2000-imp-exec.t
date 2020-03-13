@@ -38,6 +38,16 @@ test_expect_success 'flux-imp exec returns error with invalid JSON input ' '
 	echo "{" | test_must_fail $flux_imp exec shell arg
 '
 test_expect_success 'create configs for flux-imp exec and signer' '
+	cat <<-EOF >no-unpriv-exec.toml &&
+	allow-sudo = true
+	[sign]
+	max-ttl = 30
+	default-type = "none"
+	allowed-types = [ "none" ]
+	[exec]
+	allowed-users = [ "$(whoami)" ]
+	allowed-shells = [ "id", "echo" ]
+	EOF
 	cat <<-EOF >sign-none.toml &&
 	allow-sudo = true
 	[sign]
@@ -47,6 +57,7 @@ test_expect_success 'create configs for flux-imp exec and signer' '
 	[exec]
 	allowed-users = [ "$(whoami)" ]
 	allowed-shells = [ "id", "echo" ]
+	allow-unprivileged-exec = true
 	EOF
 	cat <<-EOF >sign-none-allowed-munge.toml
 	allow-sudo = true
@@ -57,9 +68,17 @@ test_expect_success 'create configs for flux-imp exec and signer' '
 	[exec]
 	allowed-users = [ "$(whoami)" ]
 	allowed-shells = [ "id", "echo" ]
+	allow-unprivileged-exec = true
 	EOF
 '
-test_expect_success 'flux-imp exec works in unprivileged mode' '
+test_expect_success 'flux-imp exec fails in unprivileged mode by default' '
+	( export FLUX_IMP_CONFIG_PATTERN=no-unpriv-exec.toml  &&
+	  fake_imp_input foo | \
+		test_must_fail $flux_imp exec echo good >noexec.out 2>&1
+	) &&
+	grep "IMP not installed setuid" noexec.out
+'
+test_expect_success 'flux-imp exec works in unprivileged mode if configured' '
 	( export FLUX_IMP_CONFIG_PATTERN=sign-none.toml  &&
 	  fake_imp_input foo | $flux_imp exec echo good >works.out
 	) &&
