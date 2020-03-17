@@ -18,6 +18,8 @@ extern int imp_casign_unprivileged (struct imp_state *imp, struct kv *);
 extern int imp_casign_privileged (struct imp_state *imp, struct kv *);
 extern int imp_exec_unprivileged (struct imp_state *imp, struct kv *);
 extern int imp_exec_privileged (struct imp_state *imp, struct kv *);
+extern int imp_kill_unprivileged (struct imp_state *imp, struct kv *);
+extern int imp_kill_privileged (struct imp_state *imp, struct kv *);
 
 /*  List of supported imp commands, curated by hand for now.
  *   For each named command, the `child_fn` runs unprivileged and the
@@ -37,6 +39,9 @@ struct impcmd impcmd_list[] = {
     { "exec",
       imp_exec_unprivileged,
       imp_exec_privileged },
+    { "kill",
+      imp_kill_unprivileged,
+      imp_kill_privileged },
 	{ NULL, NULL, NULL}
 };
 
