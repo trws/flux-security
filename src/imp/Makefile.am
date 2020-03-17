@@ -55,6 +55,7 @@ IMP_SOURCES = \
 	casign.c \
 	passwd.c \
 	passwd.h \
+	kill.c \
 	exec/user.h \
 	exec/user.c \
 	exec/exec.c
