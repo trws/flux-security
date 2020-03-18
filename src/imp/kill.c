@@ -130,6 +130,11 @@ static uid_t pid_owner (pid_t pid)
     return path_owner (path);
 }
 
+static void pid_info_destroy (struct pid_info *pi)
+{
+    free (pi);
+}
+
 static struct pid_info *pid_info_create (pid_t pid)
 {
     struct pid_info *pi = calloc (1, sizeof (*pi));
@@ -147,7 +152,7 @@ static struct pid_info *pid_info_create (pid_t pid)
 
     return pi;
 err:
-    free (pi);
+    pid_info_destroy (pi);
     return NULL;
 }
 
@@ -192,6 +197,8 @@ static void check_and_kill_process (struct imp_state *imp, pid_t pid, int sig)
                     (intmax_t) pid,
                     (uintmax_t) sig,
                     strerror (errno));
+
+    pid_info_destroy (p);
 }
 
 
