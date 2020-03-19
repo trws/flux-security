@@ -1,3 +1,19 @@
+flux-security version 0.4.0 - 2020-03-19
+----------------------------------------
+
+## New Features
+
+ * lib: add `flux_sign_wrap_as(3)` (#108)
+ * imp: add support for IMP exec command (#104, #109)
+ * imp: add support for IMP kill command (#110, #111)
+ * update internal libtomlc99 to latest (#98)
+
+## Testing
+
+ * build/test under asan and ubsan, fix errors (#97)
+ * fix tests when run on nosuid filesystems (#100)
+
+
 flux-security version 0.3.0 - 2019-01-11
 ----------------------------------------
 
