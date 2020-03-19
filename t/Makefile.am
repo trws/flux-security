@@ -19,7 +19,8 @@ TESTSCRIPTS = \
 	t1001-imp-casign.t \
 	t1002-sign-munge.t \
 	t1003-sign-curve.t \
-	t2000-imp-exec.t
+	t2000-imp-exec.t \
+	t2001-imp-kill.t
 
 TESTS = \
 	$(TESTSCRIPTS)

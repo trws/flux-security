@@ -53,6 +53,7 @@
 
 struct pid_info {
     pid_t pid;
+    uid_t pid_owner;
     char cg_path [4096];
     uid_t cg_owner;
 };
@@ -117,6 +118,23 @@ static uid_t path_owner (const char *path)
     return st.st_uid;
 }
 
+/*  return the owner of pid. -1 on failure.
+ */
+static uid_t pid_owner (pid_t pid)
+{
+    char path [128];
+    const int size = sizeof (path);
+    int n = snprintf (path, size, "/proc/%ju", (uintmax_t) pid);
+    if ((n < 0) || (n >= size))
+        return (pid_t) -1;
+    return path_owner (path);
+}
+
+static void pid_info_destroy (struct pid_info *pi)
+{
+    free (pi);
+}
+
 static struct pid_info *pid_info_create (pid_t pid)
 {
     struct pid_info *pi = calloc (1, sizeof (*pi));
@@ -125,13 +143,16 @@ static struct pid_info *pid_info_create (pid_t pid)
     if (pid < 0)
         pid = -pid;
     pi->pid = pid;
+    if ((pi->pid_owner = pid_owner (pid)) == (uid_t) -1)
+        goto err;
     if (pid_systemd_cgroup_path (pid, pi->cg_path, sizeof (pi->cg_path)) < 0)
         goto err;
     if ((pi->cg_owner = path_owner (pi->cg_path)) == (uid_t) -1)
         goto err;
+
     return pi;
 err:
-    free (pi);
+    pid_info_destroy (pi);
     return NULL;
 }
 
@@ -163,7 +184,8 @@ static void check_and_kill_process (struct imp_state *imp, pid_t pid, int sig)
                     strerror (errno));
 
     /* Check if pid is in pids cgroup owned by IMP user */
-    if (p->cg_owner != user)
+    if (p->cg_owner != user
+        && p->pid_owner != user)
         imp_die (1,
             "kill: refusing request from uid=%ju to kill pid %jd (owner=%ju)",
             (uintmax_t) user,
@@ -175,6 +197,8 @@ static void check_and_kill_process (struct imp_state *imp, pid_t pid, int sig)
                     (intmax_t) pid,
                     (uintmax_t) sig,
                     strerror (errno));
+
+    pid_info_destroy (p);
 }
 
 
