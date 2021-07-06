@@ -18,6 +18,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <glob.h>
+#include <fnmatch.h>
 #include <jansson.h>
 
 #include "src/libtomlc99/toml.h"
@@ -209,6 +210,23 @@ bool cf_array_contains (const cf_t *cf, const char *str)
             const cf_t *entry = cf_get_at (cf, i);
             if (cf_typeof (entry) == CF_STRING
                 && strcmp (cf_string (entry), str) == 0)
+                return true;
+        }
+    }
+    return false;
+}
+
+/*  Return true if 'str' matches any glob(7) pattern in cf array 'cf'.
+ *  False if array is NULL or is zero length, or does not match any pattern.
+ */
+bool cf_array_contains_match (const cf_t *cf, const char *str)
+{
+    int size;
+    if (str && cf && (size = cf_array_size (cf)) > 0) {
+        for (int i = 0; i < size; i++) {
+            const cf_t *entry = cf_get_at (cf, i);
+            if (cf_typeof (entry) == CF_STRING
+                && fnmatch (cf_string (entry), str, 0) == 0)
                 return true;
         }
     }
