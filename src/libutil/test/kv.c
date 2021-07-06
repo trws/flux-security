@@ -474,6 +474,57 @@ void join_split (void)
     kv_destroy (kv);
 }
 
+static void test_expand (void)
+{
+    char **env;
+    struct kv *kv;
+
+    ok (kv_expand_environ (NULL, NULL) < 0,
+        "kv_expand_environ (NULL, NULL) fails");
+    ok (kv_expand_environ (NULL, &env) < 0,
+        "kv_expand_environ (NULL, &env) fails");
+
+    if (!(kv = kv_create ()))
+        BAIL_OUT ("kv_create failed");
+
+    ok (kv_expand_environ (kv, NULL) < 0,
+        "kv_expand_environ (kv, NULL) fails");
+
+    ok (kv_expand_environ (kv, &env) == 0,
+        "kv_expand_environ works with empty kv");
+    ok (env[0] == NULL,
+        "returned environ array is valid but empty");
+    kv_destroy (kv);
+    kv_environ_destroy (&env);
+
+    if (!(kv = kv_create ()))
+        BAIL_OUT ("kv_create failed");
+    if (kv_put (kv, "PATH", KV_STRING, "/bin:/usr/bin") < 0
+        || kv_put (kv, "TEST_JOB_ID", KV_STRING, "ƒAAUKAY4Co") < 0
+        || kv_put (kv, "TEST_INT64", KV_INT64, 42LL) < 0
+        || kv_put (kv, "TEST_DOUBLE", KV_DOUBLE, 3.14) < 0
+        || kv_put (kv, "TEST_BOOL", KV_BOOL, true) < 0)
+        BAIL_OUT ("kv_put failed");
+
+    ok (kv_expand_environ (kv, &env) == 0,
+        "kv_expand_environ works");
+    ok (env[0] && strcmp (env[0], "PATH=/bin:/usr/bin") == 0,
+        "env[0] is correct");
+    ok (env[1] && strcmp (env[1], "TEST_JOB_ID=ƒAAUKAY4Co") == 0,
+        "env[1] is correct");
+    ok (env[2] && strcmp (env[2], "TEST_INT64=42") == 0,
+        "env[2] is correct");
+    ok (env[3] && strcmp (env[3], "TEST_DOUBLE=3.140000") == 0,
+        "env[3] is correct");
+    ok (env[4] && strcmp (env[4], "TEST_BOOL=true") == 0,
+        "env[4] is correct");
+    ok (env[5] == NULL,
+        "env[5] is NULL");
+
+    kv_destroy (kv);
+    kv_environ_destroy (&env);
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -485,6 +536,7 @@ int main (int argc, char *argv[])
     key_deletion ();
     key_update ();
     join_split ();
+    test_expand ();
 
     done_testing ();
 }
