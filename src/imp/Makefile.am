@@ -56,6 +56,7 @@ IMP_SOURCES = \
 	passwd.c \
 	passwd.h \
 	kill.c \
+	run.c \
 	exec/user.h \
 	exec/user.c \
 	exec/exec.c
