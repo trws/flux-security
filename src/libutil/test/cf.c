@@ -547,7 +547,7 @@ void test_update_glob (void)
 
     snprintf (p, sizeof (p), "%s/*.toml", dir);
 
-    ok (cf_update_glob (cf, p, &error) == 3, 
+    ok (cf_update_glob (cf, p, &error) == 3,
         "cf_update_glob successfully parsed 3 files");
 
     /* Check the cf object against 'opts'.

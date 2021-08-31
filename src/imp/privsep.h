@@ -35,7 +35,7 @@ int privsep_wait (privsep_t *ps);
 
 /*  Free memory associated with privsep handle and close associated
  *   file descriptors to parent/child.
- */  
+ */
 void privsep_destroy (privsep_t *ps);
 
 /*  Return true if running in child.
