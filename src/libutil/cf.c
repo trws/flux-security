@@ -12,11 +12,8 @@
 #  include <config.h>
 #endif /* HAVE_CONFIG_H */
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <errno.h>
 #include <string.h>
-#include <libgen.h>
 #include <glob.h>
 #include <fnmatch.h>
 #include <jansson.h>
@@ -24,7 +21,7 @@
 #include "src/libtomlc99/toml.h"
 #include "tomltk.h"
 #include "cf.h"
-#include "strlcpy.h"
+#include "path.h"
 
 #define ERRBUFSZ 200
 
@@ -233,100 +230,19 @@ bool cf_array_contains_match (const cf_t *cf, const char *str)
     return false;
 }
 
-static bool parent_dir_is_secure (cf_t *cf,
-                                  const char *filename,
-                                  struct cf_error *error)
-{
-    struct stat st;
-    char buf [PATH_MAX + 1];
-    char *dir;
-
-    if (strlcpy (buf, filename, sizeof (buf)) >= sizeof (buf)
-        || !(dir = dirname (buf))) {
-        errno = ENAMETOOLONG;
-        errprintf (error, filename, -1, "Unable to get dirname");
-        return false;
-    }
-    if (lstat (dir, &st) < 0) {
-        errprintf (error, filename, -1, "Unable to stat parent directory");
-        return false;
-    }
-    if (!S_ISDIR (st.st_mode)) {
-        errprintf (error, filename, -1,
-                   "Unable to check parent directory. Unexpected file type");
-        errno = EINVAL;
-        return false;
-    }
-    if ((st.st_uid != 0)
-        && (st.st_uid != geteuid ())) {
-        errprintf (error, filename, -1,
-                   "Invalid ownership on parent directory");
-        errno = EINVAL;
-        return false;
-    }
-    if (st.st_gid != 0
-        && st.st_gid != getegid ()
-        && (st.st_mode & S_IWGRP)
-        && !(st.st_mode & S_ISVTX)) {
-        errprintf (error, filename, -1,
-                   "parent directory is group-writeable without sticky bit");
-        errno = EINVAL;
-        return false;
-    }
-    if ((st.st_mode & S_IWOTH)
-        && !(st.st_mode & S_ISVTX)) {
-        errprintf (error, filename, -1,
-                   "parent directory is world-writeable without sticky bit");
-        errno = EINVAL;
-        return false;
-    }
-    errno = 0;
-    return true;
-}
-
 static bool filename_is_secure (cf_t *cf,
                                 const char *filename,
                                 struct cf_error *error)
 {
-    int is_symlink = 0;
-    struct stat st;
-
-    if ((filename == NULL) || (*filename == '\0')) {
-        errprintf (error, "", 0, "Filename not defined");
+    struct path_error path_error;
+    if (!path_is_secure (filename, &path_error)) {
+        errprintf (error,
+                   filename,
+                   -1,
+                   "unable to open: %s", path_error.text);
         return false;
     }
-    if ((lstat (filename, &st) == 0)
-        && S_ISLNK (st.st_mode) == 1)
-        is_symlink = 1;
-    if (stat (filename, &st) < 0) {
-        errprintf (error, filename, -1, "Failed to find config file");
-        return false;
-    }
-    if (!S_ISREG (st.st_mode)) {
-        errprintf (error, filename, -1, "File is not a regular file");
-        errno = EINVAL;
-        return false;
-    }
-    if (is_symlink) {
-        errprintf (error, filename, -1, "Refusing to open symbolic link");
-        errno = EINVAL;
-        return false;
-    }
-    if (st.st_uid != 0 && st.st_uid != geteuid ()) {
-        errprintf (error, filename, -1,
-                   "Refusing to open: insecure file ownership");
-        errno = EINVAL;
-        return false;
-    }
-    if ((st.st_mode & S_IWOTH)
-        || ((st.st_mode & S_IWGRP) && (st.st_gid != getegid ()))) {
-        errprintf (error, filename, -1,
-                   "Refusing to open: bad file permissions (%04o)",
-                   (st.st_mode & ~S_IFMT));
-        errno = EINVAL;
-        return false;
-    }
-    return parent_dir_is_secure (cf, filename, error);
+    return true;
 }
 
 static bool force_paranoia (cf_t *cf)
