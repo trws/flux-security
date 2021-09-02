@@ -32,7 +32,9 @@ libutil_la_SOURCES = \
 	aux.c \
 	aux.h \
 	strlcpy.c \
-	strlcpy.h
+	strlcpy.h \
+	path.c \
+	path.h
 
 TESTS = \
 	test_hash.t \
