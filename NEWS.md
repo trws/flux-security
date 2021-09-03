@@ -1,3 +1,18 @@
+flux-security version 0.5.0 - 2021-09-03
+----------------------------------------
+
+## New Features
+
+ * imp: add run command for prolog/epilog support (#123)
+ * check file permissions and ownership of files when running
+   privileged code (#122)
+
+## Testing
+ 
+ * ci: switch to github actions (#121)
+ * bump minimum jansson version to 2.10 (#114)
+
+
 flux-security version 0.4.0 - 2020-03-19
 ----------------------------------------
 
