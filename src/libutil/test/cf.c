@@ -547,7 +547,7 @@ void test_update_glob (void)
 
     snprintf (p, sizeof (p), "%s/*.toml", dir);
 
-    ok (cf_update_glob (cf, p, &error) == 3, 
+    ok (cf_update_glob (cf, p, &error) == 3,
         "cf_update_glob successfully parsed 3 files");
 
     /* Check the cf object against 'opts'.
@@ -739,6 +739,45 @@ void test_array_contains (void)
     cf_destroy (tab);
 }
 
+void test_array_contains_match (void)
+{
+    const char *array = "array = [ \"foo\", \"bar*\", \"baz?\" ]";
+    cf_t *tab;
+    const cf_t *cf;
+
+    if (!(tab = cf_create ()))
+        BAIL_OUT ("cf_create");
+    if (cf_update (tab, array, strlen (array), NULL) < 0)
+        BAIL_OUT ("cf_update");
+
+    cf = cf_get_in (tab, "array");
+
+    ok (cf_array_contains_match (NULL, NULL) == false,
+        "cf_array_contains_match (NULL, NULL) returns false");
+    ok (cf_array_contains_match (NULL, "barbaric") == false,
+        "cf_array_contains_match (NULL, \"barbaric\") returns false");
+    ok (cf_array_contains_match (cf, "") == false,
+        "cf_array_contains_match (cf, \"\") returns false");
+    ok (cf_array_contains_match (cf, "foobar") == false,
+        "cf_array_contains_match (cf, \"foobar\") returns false");
+    ok (cf_array_contains_match (cf, "foobar") == false,
+        "cf_array_contains_match (cf, \"foobar\") returns false");
+    ok (cf_array_contains_match (cf, "foobar") == false,
+        "cf_array_contains_match (cf, \"foobar\") returns false");
+    ok (cf_array_contains_match (cf, "bazaar") == false,
+        "cf_array_contains_match (cf, \"bazaar\") returns false");
+
+    ok (cf_array_contains_match (cf, "foo"),
+        "cf_array_contains_match (cf, \"foo\") returns true");
+    ok (cf_array_contains_match (cf, "bar"),
+        "cf_array_contains_match (cf, \"bar\") returns true");
+    ok (cf_array_contains_match (cf, "bar-none"),
+        "cf_array_contains_match (cf, \"bar-none\") returns true");
+    ok (cf_array_contains_match (cf, "baz1"),
+        "cf_array_contains_match (cf, \"baz1\") returns true");
+
+    cf_destroy (tab);
+}
 
 int main (int argc, char *argv[])
 {
@@ -753,6 +792,7 @@ int main (int argc, char *argv[])
     test_path_paranoia ();
     test_check ();
     test_array_contains ();
+    test_array_contains_match ();
 
     done_testing ();
 }

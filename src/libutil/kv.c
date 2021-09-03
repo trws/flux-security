@@ -500,6 +500,49 @@ struct kv *kv_split (const struct kv *kv1, const char *prefix)
     return kv2;
 }
 
+void kv_environ_destroy (char ***envp)
+{
+    if (envp) {
+        int saved_errno = errno;
+        char **env = *envp;
+        while (*env != NULL)
+            free (*env++);
+        free (*envp);
+        *envp = NULL;
+        errno = saved_errno;
+    }
+}
+
+int kv_expand_environ (const struct kv *kv, char ***envp)
+{
+    char **env, **p;
+    const char *var = NULL;
+    int size = 0;
+
+    if (kv == NULL || envp == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    while ((var = kv_next (kv, var)))
+        size++;
+    if (!(env = calloc (size+1, sizeof (char *))))
+        return -1;
+    p = env;
+    while ((var = kv_next (kv, var))) {
+        char *entry;
+        if (asprintf (&entry, "%s=%s", var, kv_val_string (var)) < 0)
+            goto error;
+        (*p++) = entry;
+    }
+    *envp = env;
+    return 0;
+error:
+    kv_environ_destroy (&env);
+    return -1;
+}
+
+
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
  */

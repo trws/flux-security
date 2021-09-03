@@ -32,7 +32,9 @@ libutil_la_SOURCES = \
 	aux.c \
 	aux.h \
 	strlcpy.c \
-	strlcpy.h
+	strlcpy.h \
+	path.c \
+	path.h
 
 TESTS = \
 	test_hash.t \
@@ -40,7 +42,8 @@ TESTS = \
 	test_cf.t \
 	test_kv.t \
 	test_sha256.t \
-	test_aux.t
+	test_aux.t \
+	test_path.t
 
 test_ldadd = \
 	$(top_builddir)/src/libutil/libutil.la \
@@ -81,3 +84,7 @@ test_sha256_t_CPPFLAGS = $(test_cppflags)
 test_aux_t_SOURCES = test/aux.c
 test_aux_t_LDADD = $(test_ldadd)
 test_aux_t_CPPFLAGS = $(test_cppflags)
+
+test_path_t_SOURCES = test/path.c
+test_path_t_LDADD = $(test_ldadd)
+test_path_t_CPPFLAGS = $(test_cppflags)

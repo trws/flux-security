@@ -111,6 +111,8 @@ PKG_CHECK_MODULES([MUNGE], [munge], [], [])
 #  Other checks
 #
 AX_CODE_COVERAGE
+AS_IF([test x$enable_code_coverage = xyes], [
+    AC_DEFINE([CODE_COVERAGE_ENABLED], [1], [code coverage support])])
 
 AC_PKGCONFIG
 

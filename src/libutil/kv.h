@@ -90,6 +90,12 @@ int kv_encode (const struct kv *kv, const char **buf, int *len);
  */
 struct kv *kv_decode (const char *buf, int len);
 
+/* Return an environment constructed from the struct kv.
+ */
+int kv_expand_environ (const struct kv *kv, char ***envp);
+
+void kv_environ_destroy (char ***envp);
+
 /* Iteration example:
  *
  *   const char *key = NULL;

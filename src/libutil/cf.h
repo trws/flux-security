@@ -97,6 +97,10 @@ int cf_array_size (const cf_t *cf);
  */
 bool cf_array_contains (const cf_t *cf, const char *str);
 
+/* Return true if array contains a pattern that matches str
+ */
+bool cf_array_contains_match (const cf_t *cf, const char *str);
+
 /* Update table 'cf' with info parsed from TOML 'buf' or 'filename'.
  * On success return 0.  On failure, return -1 with errno set.
  * If error is non-NULL, write error description there.
