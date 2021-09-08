@@ -253,7 +253,7 @@ exit_status () {
     return retval;
 }
 
-int
+void
 bail_out (int ignore, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -262,7 +262,6 @@ bail_out (int ignore, const char *fmt, ...) {
     printf("\n");
     va_end(args);
     exit(255);
-    return 0;
 }
 
 void
