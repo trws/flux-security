@@ -368,15 +368,19 @@ int sigcert_store (const struct sigcert *cert, const char *name)
         goto error;
     if (sigcert_fwrite_public (cert, fp) < 0)
         goto error;
-    if (fclose (fp) < 0)
+    if (fclose (fp) == EOF) {
+        fp = NULL;
         goto error;
+    }
     if (cert->secret_valid) {
         if (!(fp = fopen_mode (name, 0600)))
             goto error;
         if (sigcert_fwrite_secret (cert, fp) < 0)
             goto error;
-        if (fclose (fp) < 0)
+        if (fclose (fp) == EOF) {
+            fp = NULL;
             goto error;
+        }
     }
     return 0;
 error:

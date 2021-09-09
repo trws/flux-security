@@ -35,7 +35,8 @@ int     cmp_ok_at_loc   (const char *file, int line, int a, const char *op,
                          int b, const char *fmt, ...);
 int     cmp_mem_at_loc  (const char *file, int line, const void *got,
                          const void *expected, size_t n, const char *fmt, ...);
-int     bail_out        (int ignore, const char *fmt, ...);
+void    bail_out        (int ignore, const char *fmt, ...)
+                        __attribute__((noreturn));
 void    tap_plan        (int tests, const char *fmt, ...);
 int     diag            (const char *fmt, ...);
 int     exit_status     (void);
