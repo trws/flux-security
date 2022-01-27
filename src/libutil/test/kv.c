@@ -525,6 +525,92 @@ static void test_expand (void)
     kv_environ_destroy (&env);
 }
 
+static void test_argv ()
+{
+    char **argv;
+    struct kv *kv;
+    const char *key = NULL;
+
+    ok (kv_expand_argv (NULL, NULL) < 0 && errno == EINVAL,
+        "kv_expand_argv (NULL, NULL) fails");
+    ok (kv_expand_argv (NULL, &argv) < 0 && errno == EINVAL,
+        "kv_expand_argv (NULL, &env) fails");
+    ok (kv_encode_argv (NULL) == NULL && errno == EINVAL,
+        "kv_encode_argv (NULL) fails");
+
+    if (!(kv = kv_create ()))
+        BAIL_OUT ("kv_create failed");
+
+    ok (kv_expand_argv (kv, NULL) < 0,
+        "kv_expand_argv (kv, NULL) fails");
+    ok (kv_expand_argv (kv, &argv) == 0,
+        "kv_expand_argv works with empty kv");
+    ok (argv[0] == NULL,
+        "resulting argv has no entries");
+
+    kv_argv_destroy (&argv);
+    ok (argv == NULL,
+        "argv is NULL after destroy");
+
+    ok (kv_put (kv, "0", KV_STRING, "foo") == 0,
+        "kv_put first element works");
+    ok (kv_put (kv, "1", KV_STRING, "--test") == 0,
+        "kv_put second element works");
+    ok (kv_put (kv, "3", KV_STRING, "bar") == 0,
+        "kv_put third element works");
+
+    ok (kv_expand_argv (kv, &argv) == 0,
+        "kv_expand_argv works");
+
+    is (argv[0], "foo",
+        "argv[0] is correct");
+    is (argv[1], "--test",
+        "argv[1] is correct");
+    is (argv[2], "bar",
+        "argv[2] is correct");
+    ok (argv[3] == NULL,
+        "argv is properly terminated");
+
+    kv_destroy (kv);
+    kv_argv_destroy (&argv);
+
+    const char *test_empty[] = { NULL };
+
+    ok ((kv = kv_encode_argv (test_empty)) != NULL,
+        "kv_encode_argv of empty argv works");
+    diag_kv (kv);
+    ok (kv_next (kv, NULL) == NULL,
+        "returned kv is empty");
+
+    kv_destroy (kv);
+
+    const char *test_argv[] = {
+        "test",
+        "--foo",
+        "baz",
+        NULL,
+    };
+    const char *expected_keys[] = { "0", "1", "2" };
+
+    ok ((kv = kv_encode_argv (test_argv)) != NULL,
+        "kv_encode_argv works");
+    diag_kv (kv);
+
+    key = NULL;
+    int i = 0;
+    while ((key = kv_next (kv, key))) {
+        is (key, expected_keys[i],
+            "key %d is %s",
+            i, expected_keys[i]);
+        is (kv_val_string (key), test_argv[i],
+            "value %d is %s",
+            i, test_argv[i]);
+        i++;
+    }
+    kv_destroy (kv);
+
+}
+
 int main (int argc, char *argv[])
 {
     plan (NO_PLAN);
@@ -537,6 +623,7 @@ int main (int argc, char *argv[])
     key_update ();
     join_split ();
     test_expand ();
+    test_argv ();
 
     done_testing ();
 }
