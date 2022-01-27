@@ -54,7 +54,7 @@ struct imp_exec {
 
     const char *J;
     const char *shell;
-    const char *arg;
+    struct kv *args;
     const void *spec;
     int specsz;
 };
@@ -97,6 +97,7 @@ static void imp_exec_destroy (struct imp_exec *exec)
         flux_security_destroy (exec->sec);
         json_decref (exec->input);
         passwd_destroy (exec->imp_pwd);
+        kv_destroy (exec->args);
         free (exec);
     }
 }
@@ -140,8 +141,10 @@ static void imp_exec_init_kv (struct imp_exec *exec, struct kv *kv)
         imp_die (1, "exec: Error decoding J");
     if (kv_get (kv, "shell_path", KV_STRING, &exec->shell) < 0)
         imp_die (1, "exec: Failed to get job shell path");
-    if (kv_get (kv, "arg", KV_STRING, &exec->arg) < 0)
-        imp_die (1, "exec: Failed to get job shell arg");
+
+    /*  Split shell argv from struct kv */
+    if (!(exec->args = kv_split (kv, "args")))
+        imp_die (1, "exec: Failed to get job shell arguments");
 
     imp_exec_unwrap (exec, exec->J);
 }
@@ -161,8 +164,8 @@ static void imp_exec_init_stream (struct imp_exec *exec, FILE *fp)
 
     exec->shell = imp->argv[2];
 
-    /*  Only a single argument to the shell is currently supported */
-    exec->arg = imp->argv[3];
+    if (!(exec->args = kv_encode_argv ((const char **) &imp->argv[2])))
+        imp_die (1, "exec: failed to encode shell arguments");
 
     /* Get input from JSON on stdin */
     if (!(exec->input = json_loadf (fp, 0, &err))
@@ -178,7 +181,7 @@ static void imp_exec_init_stream (struct imp_exec *exec, FILE *fp)
 
 static void __attribute__((noreturn)) imp_exec (struct imp_exec *exec)
 {
-    const char *args[3];
+    char **argv;
     int exit_code;
 
     /* Setup minimal environment */
@@ -187,10 +190,10 @@ static void __attribute__((noreturn)) imp_exec (struct imp_exec *exec)
     if (chdir ("/") < 0)
         imp_die (1, "exec: failed to chdir to /");
 
-    args[0] = exec->shell;
-    args[1] = exec->arg;
-    args[2] = NULL;
-    execvp (exec->shell, (char **) args);
+    if (kv_expand_argv (exec->args, &argv) < 0)
+        imp_die (1, "exec: failed to expand argv");
+
+    execvp (exec->shell, argv);
 
     if (errno == EPERM || errno == EACCES)
         exit_code =  126;
@@ -242,8 +245,8 @@ static void imp_exec_put_kv (struct imp_exec *exec,
         imp_die (1, "exec: Error decoding J");
     if (kv_put (kv, "shell_path", KV_STRING, exec->shell) < 0)
         imp_die (1, "exec: Failed to get job shell path");
-    if (kv_put (kv, "arg", KV_STRING, exec->arg) < 0)
-        imp_die (1, "exec: Failed to get job shell arg");
+    if (kv_join (kv, exec->args, "args") < 0)
+        imp_die (1, "exec: Failed to set job shell arguments");
 }
 
 int imp_exec_unprivileged (struct imp_state *imp, struct kv *kv)
