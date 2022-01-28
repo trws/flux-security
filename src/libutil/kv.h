@@ -94,7 +94,17 @@ struct kv *kv_decode (const char *buf, int len);
  */
 int kv_expand_environ (const struct kv *kv, char ***envp);
 
+/* Return an argv constructed from the struct kv.
+ */
+int kv_expand_argv (const struct kv *kv, char ***argvp);
+
+/* Return a struct kv encoded from argv array. Keys are string integers
+ *  starting at "0", e.g. "O", "1", "2", ...
+ */
+struct kv *kv_encode_argv (const char **argvp);
+
 void kv_environ_destroy (char ***envp);
+void kv_argv_destroy (char ***argvp);
 
 /* Iteration example:
  *

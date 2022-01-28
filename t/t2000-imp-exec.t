@@ -135,4 +135,14 @@ test_expect_success SUDO 'flux-imp exec works under sudo' '
 	id -u > id-sudo.expected &&
         test_cmp id-sudo.expected id-sudo.out
 '
+test_expect_success SUDO 'flux-imp exec passes more than one argument to shell' '
+	( export FLUX_IMP_CONFIG_PATTERN=sign-none.toml  &&
+          fake_imp_input foo | \
+	    $SUDO FLUX_IMP_CONFIG_PATTERN=sign-none.toml \
+	      $flux_imp exec id --zero --user >id-sudo2.out
+        ) &&
+	test_debug "echo expecting uid=$(id -u), got $(cat -v id-sudo2.out)" &&
+	id --zero --user > id-sudo2.expected &&
+        test_cmp id-sudo2.expected id-sudo2.out
+'
 test_done

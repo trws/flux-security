@@ -542,6 +542,61 @@ error:
     return -1;
 }
 
+void kv_argv_destroy (char ***argvp)
+{
+    kv_environ_destroy (argvp);
+}
+
+int kv_expand_argv (const struct kv *kv, char ***argvp)
+{
+    char **argv, **p;
+    const char *var = NULL;
+    int argc = 0;
+
+    if (kv == NULL || argvp == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    while ((var = kv_next (kv, var)))
+        argc++;
+
+    if (!(argv = calloc (argc+1, sizeof (char *))))
+        return -1;
+
+    p = argv;
+    while ((var = kv_next (kv, var))) {
+        if (!(*p = strdup (kv_val_string (var))))
+            goto error;
+        p++;
+    }
+    *argvp = argv;
+    return 0;
+error:
+    kv_argv_destroy (&argv);
+    return -1;
+}
+
+struct kv *kv_encode_argv (const char **argv)
+{
+    struct kv * kv;
+    if (!argv) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (!(kv = kv_create ()))
+        return NULL;
+    for (int i = 0; argv[i] != NULL; i++) {
+        char key [21];
+        (void) sprintf (key, "%d", i);
+        if (kv_put (kv, key, KV_STRING, argv[i]) < 0)
+            goto error;
+    }
+    return kv;
+error:
+    kv_destroy (kv);
+    return NULL;
+}
 
 /*
  * vi:tabstop=4 shiftwidth=4 expandtab
