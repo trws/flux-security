@@ -1,5 +1,7 @@
 .NOTPARALLEL:
 
+SUBDIRS = . test
+
 MAN5_FILES = \
 	man5/flux-config-security.5 \
 	man5/flux-config-security-imp.5
