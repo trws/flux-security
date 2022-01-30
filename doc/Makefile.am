@@ -3,14 +3,21 @@
 MAN5_FILES = \
 	man5/flux-config-security-imp.5
 
+MAN8_FILES = \
+	man8/flux-imp.8
+
 RST_FILES = \
-	$(MAN5_FILES:.5=.rst)
+	$(MAN5_FILES:.5=.rst) \
+	$(MAN8_FILES:.8=.rst)
 
 MAN_FILES = \
-	$(MAN5_FILES)
+	$(MAN5_FILES) \
+	$(MAN8_FILES)
 
 if ENABLE_DOCS
-man_MANS = $(MAN5_FILES)
+man_MANS = \
+	$(MAN5_FILES) \
+	$(MAN8_FILES)
 endif
 
 .SUFFIXES = .rst .5
@@ -63,6 +70,7 @@ EXTRA_DIST = \
 	index.rst \
 	requirements.txt \
 	man5/index.rst \
+	man8/index.rst \
 	$(RST_FILES)
 
 CLEANFILES = \
