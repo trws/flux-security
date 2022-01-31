@@ -9,7 +9,8 @@ ACLOCAL_AMFLAGS = -I config
 EXTRA_DIST = \
 	config/tap-driver.sh \
 	NOTICE.LLNS \
-	README.md
+	README.md \
+	NEWS.md
 
 # coverage
 CODE_COVERAGE_IGNORE_PATTERN = \
