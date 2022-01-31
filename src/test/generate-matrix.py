@@ -129,16 +129,16 @@ matrix.add_build(
     image="focal",
 )
 
-# Centos7
+# RHEL7 clone
 matrix.add_build(
-    name="centos7",
-    image="centos7",
+    name="el7",
+    image="el7",
 )
 
-# Centos8
+# RHEL8 clone
 matrix.add_build(
-    name="centos8",
-    image="centos8",
+    name="el8",
+    image="el8",
 )
 
 # Fedora 33
