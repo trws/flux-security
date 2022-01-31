@@ -19,5 +19,6 @@ author = 'This page is maintained by the Flux community.'
 man_pages = [
     ('man5/flux-config-security', 'flux-config-security', 'Flux security configuration files', [author], 5),
     ('man5/flux-config-security-imp', 'flux-config-security-imp', 'configure Flux IMP behavior', [author], 5),
+    ('man5/flux-config-security-sign', 'flux-config-security-sign', 'configure Flux security signing library', [author], 5),
     ('man8/flux-imp', 'flux-imp', 'Flux Independent Minister of Privilege', [author], 8),
 ]

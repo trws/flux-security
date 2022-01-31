@@ -4,7 +4,8 @@ SUBDIRS = . test
 
 MAN5_FILES = \
 	man5/flux-config-security.5 \
-	man5/flux-config-security-imp.5
+	man5/flux-config-security-imp.5 \
+	man5/flux-config-security-sign.5
 
 MAN8_FILES = \
 	man8/flux-imp.8

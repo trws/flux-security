@@ -7,3 +7,4 @@ man5
 
   flux-config-security
   flux-config-security-imp
+  flux-config-security-sign
