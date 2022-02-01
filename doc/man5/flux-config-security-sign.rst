@@ -87,6 +87,8 @@ RFC 15: Independent Minister of Privilege for Flux: The Security IMP: https://fl
 
 MUNGE (MUNGE Uid 'N' Gid Emporium) https://dun.github.io/munge/
 
+libsodium https://doc.libsodium.org/
+
 
 SEE ALSO
 ========
