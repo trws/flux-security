@@ -64,7 +64,7 @@ epilog or other script with elevated privileges:
    The run table consists of a dictionary of tables, each of which
    configures a new ``flux-imp run`` command. In the common case the
    sub-tables might be ``[run.prolog]`` and ``[run.epilog]``, but arbitrary
-   commands can also be placeed here, for example if a node health check
+   commands can also be placed here, for example if a node health check
    script or other command needs to be run with privileges.
 
 Each sub-table under ``[run]`` further supports the following keys:

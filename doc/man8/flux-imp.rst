@@ -56,7 +56,7 @@ required. Single user Flux instances do not use **flux-imp**.
 
 File permissions, access controls, or SELinux policy of **flux-imp**
 should be configured such that access is restricted to only those users
-that require mult-user Flux capability. For example, for a system instance
+that require multi-user Flux capability. For example, for a system instance
 running as user ``flux``, it is suggested that permissions for **flux-imp**
 be set such that only the ``flux`` user or group has execute permission.
 

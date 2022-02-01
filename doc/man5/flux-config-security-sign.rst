@@ -59,7 +59,7 @@ munge.socket-path
 The following keys apply only to the ``curve`` mechanism:
 
 curve.require-ca
-   A boolean value that determins whether the signing certificate should
+   A boolean value that determines whether the signing certificate should
    be validated against a certificate authority before use.
 
 curve.cert-path

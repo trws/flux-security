@@ -21,7 +21,7 @@ set when ``flux-security`` is built and cannot be altered at runtime:
 
 As with :core:man5:`flux-config`, Flux security configuration files follow the
 TOML file format, with configuration subdivided by function into separate TOML
-tables.  The tables for each heirarchy may all appear in a single ``.toml``
+tables.  The tables for each hierarchy may all appear in a single ``.toml``
 file or be fragmented in multiple files that match the appropriate
 :linux:man7:`glob` pattern.  The configuration is assumed to be identical for
 all Flux components across a given Flux instance.
@@ -32,7 +32,7 @@ Security configuration files, including the ``conf.d`` directory and individual
 - owner of ``root``
 - group of ``root``
 - must not be writable by others
-- must not be a symobolic link
+- must not be a symbolic link
 - ``.toml`` files must be regular files
 
 There is no mechanism to tell Flux components to reread the Flux security
