@@ -59,7 +59,7 @@ munge.socket-path
 The following keys apply only to the ``curve`` mechanism:
 
 curve.require-ca
-   A boolean value that determins whether the signing certificate should
+   A boolean value that determines whether the signing certificate should
    be validated against a certificate authority before use.
 
 curve.cert-path
@@ -86,6 +86,8 @@ Flux: http://flux-framework.org
 RFC 15: Independent Minister of Privilege for Flux: The Security IMP: https://flux-framework.readthedocs.io/projects/flux-rfc/en/latest/spec_15.html
 
 MUNGE (MUNGE Uid 'N' Gid Emporium) https://dun.github.io/munge/
+
+libsodium https://doc.libsodium.org/
 
 
 SEE ALSO
