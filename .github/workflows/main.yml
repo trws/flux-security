@@ -83,17 +83,21 @@ jobs:
     - name: create release
       id: create_release
       if: success() && matrix.create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ github.ref }}
-        release_name: flux-security ${{ github.ref }}
+        tag_name: ${{ matrix.tag }}
+        release_name: flux-security ${{ matrix.tag }}
         prerelease: true
-        body: >
+        body: |
           View [Release Notes](https://github.com/${{ github.repository }}/blob/${{ github.ref }}/NEWS.md) for flux-security ${{ github.ref }}
 
     - name: upload tarball
       id: upload-tarball
       if: success() && matrix.create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
