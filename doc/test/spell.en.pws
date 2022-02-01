@@ -547,3 +547,6 @@ uid
 SELinux
 whoami
 multi
+ctx
+getuid
+mech

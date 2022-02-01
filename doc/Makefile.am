@@ -2,6 +2,13 @@
 
 SUBDIRS = . test
 
+MAN3_FILES_PRIMARY = \
+	man3/flux_sign_wrap.3
+MAN3_FILES_SECONDARY = \
+	man3/flux_sign_wrap_as.3
+MAN3_FILES = $(MAN3_FILES_PRIMARY) $(MAN3_FILES_SECONDARY)
+
+
 MAN5_FILES = \
 	man5/flux-config-security.5 \
 	man5/flux-config-security-imp.5 \
@@ -11,20 +18,23 @@ MAN8_FILES = \
 	man8/flux-imp.8
 
 RST_FILES = \
+	$(MAN3_FILES_PRIMARY:.3=.rst) \
 	$(MAN5_FILES:.5=.rst) \
 	$(MAN8_FILES:.8=.rst)
 
 MAN_FILES = \
+	$(MAN3_FILES) \
 	$(MAN5_FILES) \
 	$(MAN8_FILES)
 
 if ENABLE_DOCS
 man_MANS = \
+	$(MAN3_FILES) \
 	$(MAN5_FILES) \
 	$(MAN8_FILES)
 endif
 
-.SUFFIXES = .rst .5
+.SUFFIXES = .rst .3 .5 .8
 
 sphinx_man = $(sphinx_man_$(V))
 sphinx_man_ = $(sphinx_man_$(AM_DEFAULT_VERBOSITY))
@@ -73,6 +83,7 @@ EXTRA_DIST = \
 	domainrefs.py \
 	index.rst \
 	requirements.txt \
+	man3/index.rst \
 	man5/index.rst \
 	man8/index.rst \
 	$(RST_FILES)

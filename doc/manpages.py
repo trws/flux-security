@@ -17,6 +17,8 @@ author = 'This page is maintained by the Flux community.'
 # - Author (use [author])
 # - Manual section
 man_pages = [
+    ('man3/flux_sign_wrap', 'flux_sign_wrap', 'Wrap signed credential', [author], 3),
+    ('man3/flux_sign_wrap', 'flux_sign_wrap_as', 'Wrap signed credential', [author], 3),
     ('man5/flux-config-security', 'flux-config-security', 'Flux security configuration files', [author], 5),
     ('man5/flux-config-security-imp', 'flux-config-security-imp', 'configure Flux IMP behavior', [author], 5),
     ('man5/flux-config-security-sign', 'flux-config-security-sign', 'configure Flux security signing library', [author], 5),
