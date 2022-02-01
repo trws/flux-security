@@ -8,13 +8,13 @@ AC_INIT([flux-security],
 
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
-AC_CONFIG_SRCDIR([NEWS])
+AC_CONFIG_SRCDIR([NEWS.md])
 AC_CANONICAL_SYSTEM
 
 #
 #  Automake support:
 #
-AM_INIT_AUTOMAKE([subdir-objects tar-pax])
+AM_INIT_AUTOMAKE([subdir-objects tar-pax foreign])
 AM_SILENT_RULES([yes])
 AM_CONFIG_HEADER([config/config.h])
 AM_MAINTAINER_MODE([enable])
