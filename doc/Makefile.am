@@ -4,10 +4,12 @@ SUBDIRS = . test
 
 MAN3_FILES_PRIMARY = \
 	man3/flux_security_create.3 \
+	man3/flux_security_last_error.3 \
 	man3/flux_sign_unwrap.3 \
 	man3/flux_sign_wrap.3
 MAN3_FILES_SECONDARY = \
 	man3/flux_security_destroy.3 \
+	man3/flux_security_last_errnum.3 \
 	man3/flux_sign_unwrap_anymech.3 \
 	man3/flux_sign_wrap_as.3
 MAN3_FILES = $(MAN3_FILES_PRIMARY) $(MAN3_FILES_SECONDARY)
