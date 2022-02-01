@@ -1,3 +1,23 @@
+flux-security version 0.6.0 - 2022-01-31
+----------------------------------------
+
+## New Features
+
+ * imp: support multiple arguments to job shell in exec (#128)
+ * doc: add infrastructure for sphinx-generated docs and section 5 and 8
+   manual pages (#131)
+
+## Testing
+
+ * mergify:  replace strict merge with queue+rebase (#129)
+ * ci: add fedora 34 and -fanalyzer build to ci checks (#125)
+ * ci: rename centos7/8 to el7/8 (#134)
+
+## Cleanup
+
+ * README: update LLNL-CODE (#126)
+ * build: use automake foreign mode (#132)
+
 flux-security version 0.5.0 - 2021-09-03
 ----------------------------------------
 
