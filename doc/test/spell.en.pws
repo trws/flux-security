@@ -547,3 +547,10 @@ uid
 SELinux
 whoami
 multi
+ctx
+getuid
+mech
+POSIX
+anymech
+enum
+NOVERIFY
