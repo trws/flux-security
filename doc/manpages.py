@@ -22,7 +22,7 @@ man_pages = [
     ('man3/flux_sign_unwrap', 'flux_sign_unwrap', 'Unwrap signed credential', [author], 3),
     ('man3/flux_sign_unwrap', 'flux_sign_unwrap_anymech', 'Unwrap signed credential', [author], 3),
     ('man3/flux_security_create', 'flux_security_create', 'Create Flux security context', [author], 3),
-    ('man3/flux_security_create', 'flux_security_destroy', 'Create Flux security context', [author], 3),
+    ('man3/flux_security_create', 'flux_security_destroy', 'Destroy Flux security context', [author], 3),
     ('man3/flux_security_last_error', 'flux_security_last_error', 'Get last error string', [author], 3),
     ('man3/flux_security_last_error', 'flux_security_last_errnum', 'Get last error number', [author], 3),
     ('man5/flux-config-security', 'flux-config-security', 'Flux security configuration files', [author], 5),
