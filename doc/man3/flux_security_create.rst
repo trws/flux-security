@@ -46,3 +46,9 @@ RESOURCES
 Flux: http://flux-framework.org
 
 RFC 15: Independent Minister of Privilege for Flux: The Security IMP: https://flux-framework.readthedocs.io/projects/flux-rfc/en/latest/spec_15.html
+
+
+SEE ALSO
+========
+
+:man3:`flux_security_last_error`
