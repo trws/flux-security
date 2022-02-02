@@ -8,6 +8,8 @@ SYNOPSIS
 
 ::
 
+   #include <flux/security/sign.h>
+
    const char *flux_sign_wrap (flux_security_t *ctx,
                                const void *buf,
                                int len,
@@ -29,10 +31,11 @@ DESCRIPTION
 suitable for unwrapping with :man3:`flux_sign_unwrap`.  The signing user is
 taken to be the userid returned by :linux:man2:`getuid`.  *ctx* is a Flux
 security context from :man3:`flux_security_create`.  *mech_type* selects the
-signing mechanism (NULL for the configured default).  The *flags* parameter
-must be set to zero.  The function returns a NULL terminated credential string
-that remains valid until ``flux_sign_wrap()`` is called again.  The caller
-should not attempt to free the credential.
+signing mechanism, and may be set to NULL to select the default defined
+by :man5:`flux-config-security-sign`.  The *flags* parameter must be set to
+zero.  The function returns a NULL terminated credential string that remains
+valid until ``flux_sign_wrap()`` is called again.  The caller should not
+attempt to free the credential.
 
 ``flux_sign_wrap_as()`` is identical to ``flux_sign_wrap()``, except the
 signing user may be explicitly specified with the *userid* parameter.

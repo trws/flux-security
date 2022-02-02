@@ -8,6 +8,8 @@ SYNOPSIS
 
 ::
 
+   #include <flux/security/sign.h>
+
    enum {
        FLUX_SIGN_NOVERIFY = 1,
    };
@@ -47,7 +49,7 @@ a NULL value.
 
 ``flux_sign_unwrap_anymech()`` is identical to ``flux_sign_unwrap()``, except
 that signature verification can succeed even if the mechanism is not one of
-the configured allowed types.
+the allowed types defined by :man5:`flux-config-security-sign`.
 
 
 RETURN VALUE

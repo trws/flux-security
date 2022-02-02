@@ -8,6 +8,8 @@ SYNOPSIS
 
 ::
 
+   #include <flux/security/context.h>
+
    const char *flux_security_last_error (flux_security_t *ctx);
 
    int flux_security_last_errnum (flux_security_t *ctx);
