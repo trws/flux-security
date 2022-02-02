@@ -8,6 +8,8 @@ SYNOPSIS
 
 ::
 
+   #include <flux/security/sign.h>
+
    enum {
        FLUX_SIGN_NOVERIFY = 1,
    };

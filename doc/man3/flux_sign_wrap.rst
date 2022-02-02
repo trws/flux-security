@@ -8,6 +8,8 @@ SYNOPSIS
 
 ::
 
+   #include <flux/security/sign.h>
+
    const char *flux_sign_wrap (flux_security_t *ctx,
                                const void *buf,
                                int len,

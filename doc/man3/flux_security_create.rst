@@ -8,6 +8,8 @@ SYNOPSIS
 
 ::
 
+   #include <flux/security/context.h>
+
    flux_security_t *flux_security_create (int flags);
 
    void flux_security_destroy (flux_security_t *ctx);
