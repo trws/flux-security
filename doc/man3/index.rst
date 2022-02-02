@@ -9,3 +9,4 @@ man3
   flux_sign_wrap
   flux_sign_unwrap
   flux_security_last_error
+  flux_security_aux_set
