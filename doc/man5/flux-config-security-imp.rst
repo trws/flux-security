@@ -118,4 +118,4 @@ RFC 15: Independent Minister of Privilege for Flux: The Security IMP: https://fl
 SEE ALSO
 ========
 
-:man5:`flux-security-config`, :core:man5:`flux-config`, :man8:`flux-imp`
+:man5:`flux-config-security`, :core:man5:`flux-config`, :man8:`flux-imp`
