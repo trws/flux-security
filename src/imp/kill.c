@@ -22,9 +22,13 @@
  *  setting directs systemd to delegate ownership of the flux.service
  *  cgroup to the user under which Flux is runnng, e.g. "flux".
  *
- *  Since all jobs will executed within this cgroup or a child,
+ *  Since all Flux jobs will be executed within this cgroup or a child,
  *  flux-imp kill may authorize signal delivery to any task where
- *  the tasks cgroup is owned by the requesting user.
+ *  the task's cgroup is owned by the requesting user.
+ *
+ *  These assumptions hold even if Flux is using a systemd user instance
+ *  to launch multi-user jobs, since the systemd instance spawning jobs
+ *  will also be running under a delegated cgroup.
  *
  */
 
