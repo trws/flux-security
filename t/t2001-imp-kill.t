@@ -52,7 +52,13 @@ test_expect_success SUDO 'flux-imp kill: sudo: user must be in allowed-shells' '
 '
 
 test "$chain_lint" = "t" || test_set_prereq NO_CHAIN_LINT
-test -d /sys/fs/cgroup/systemd && test_set_prereq SYSTEMD_CGROUP
+
+
+test "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" = "cgroup2fs" \
+  -o "$(stat -fc %T /sys/fs/cgroup/unified 2>/dev/null)" = "cgroup2fs" \
+  -o "$(stat -fc %T /sys/fs/cgroup/systemd 2>/dev/null)" = "cgroup2fs" \
+  -o "$(stat -fc %T /sys/fs/cgroup/systemd 2>/dev/null)" = "cgroupfs" \
+     && test_set_prereq SYSTEMD_CGROUP
 
 test_expect_success NO_CHAIN_LINT,SYSTEMD_CGROUP 'flux-imp kill: works in unpriv mode' '
 	name=allowed-user
