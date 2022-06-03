@@ -45,10 +45,16 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
+#ifdef HAVE_LINUX_MAGIC_H
+#include <linux/magic.h>
+#endif
+
 #include <pwd.h>
 #include <signal.h>
 
 #include "src/libutil/kv.h"
+#include "src/libutil/strlcpy.h"
 
 #include "imp_log.h"
 #include "imp_state.h"
@@ -62,10 +68,53 @@ struct pid_info {
     uid_t cg_owner;
 };
 
-/*  Hard-coded path to systemd cgroup mount directory. This may
- *   need to be moved to configuration at some point.
+struct cgroup_info {
+    char mount_dir[PATH_MAX + 1];
+    bool unified;
+};
+
+/*  Determine if this system is using the unified (v2) or legacy (v1)
+ *   cgroups hierarchy (See https://systemd.io/CGROUP_DELEGATION/)
+ *   and mount point for systemd managed cgroups.
  */
-static const char cgroup_mount_dir[] = "/sys/fs/cgroup/systemd";
+static int cgroup_info_init (struct cgroup_info *cg)
+{
+    struct statfs fs;
+
+    (void) strlcpy (cg->mount_dir, "/sys/fs/cgroup", sizeof (cg->mount_dir));
+    cg->unified = true;
+
+    if (statfs (cg->mount_dir, &fs) < 0)
+        return -1;
+
+#ifdef CGROUP2_SUPER_MAGIC
+    /* if cgroup2 fs mounted: unified hierarchy for all users of cgroupfs
+     */
+    if (fs.f_type == CGROUP2_SUPER_MAGIC)
+        return 0;
+#endif /* CGROUP2_SUPER_MAGIC */
+
+    /*  O/w, if /sys/fs/cgroup is mounted as tmpfs, we need to check
+     *   for /sys/fs/cgroup/systemd mounted as cgroupfs (legacy).
+     *   We do not support hybrid mode (/sys/fs/cgroup/systemd or
+     *   /sys/fs/cgroup/unified mounted as cgroup2fs), since there were
+     *   no systems on which to test this configuration.
+     */
+    if (fs.f_type == TMPFS_MAGIC) {
+
+        (void) strlcpy (cg->mount_dir,
+                        "/sys/fs/cgroup/systemd",
+                        sizeof (cg->mount_dir));
+        if (statfs (cg->mount_dir, &fs) == 0
+            && fs.f_type == CGROUP_SUPER_MAGIC) {
+            cg->unified = false;
+            return 0;
+            }
+    }
+
+    /*  Unable to determine cgroup mount point and/or unified vs legacy */
+    return -1;
+}
 
 /*  Return the systemd cgroup path for PID `pid` in the provided buffer
  *  Looks up the 'name=systemd'[*] subsystem relative cgroup path in
@@ -82,6 +131,10 @@ static int pid_systemd_cgroup_path (pid_t pid, char *buf, int len)
     int n;
     char file [4096];
     char *line = NULL;
+    struct cgroup_info cgroup;
+
+    if (cgroup_info_init (&cgroup) < 0)
+        return -1;
 
     n = snprintf (file, sizeof(file), "/proc/%ju/cgroup", (uintmax_t) pid);
     if ((n < 0) || (n >= (int) sizeof(file))
@@ -99,8 +152,8 @@ static int pid_systemd_cgroup_path (pid_t pid, char *buf, int len)
             continue;
         /* Nullify subsys, relpath is already nul-terminated at newline */
         *(relpath++) = '\0';
-        if (strcmp (subsys, "name=systemd") == 0) {
-            n = snprintf (buf, len, "%s%s", cgroup_mount_dir, relpath);
+        if (cgroup.unified || strcmp (subsys, "name=systemd") == 0) {
+            n = snprintf (buf, len, "%s%s", cgroup.mount_dir, relpath);
             if ((n > 0) && (n < len))
                 rc = 0;
             break;
