@@ -59,7 +59,8 @@ test_expect_success 'create test shell scripts' '
 	env
 	EOF
 	chmod +x $TESTDIR/test.sh &&
-	touch $TESTDIR/noexec.sh
+	touch $TESTDIR/noexec.sh &&
+	chmod 600 $TESTDIR/noexec.sh
 '
 test_expect_success SUDO 'set appropriate permissions for sudo based tests' '
 	$SUDO chown root.root $TESTDIR $TESTDIR/* &&
