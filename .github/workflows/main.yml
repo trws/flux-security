@@ -78,7 +78,7 @@ jobs:
     - name: prep release
       id: prep_release
       if: success() && matrix.create_release
-      run: echo "::set-output name=tarball::$(echo flux-security*.tar.tz)"
+      run: echo "::set-output name=tarball::$(echo flux-security*.tar.gz)"
 
     - name: create release
       id: create_release
@@ -91,7 +91,7 @@ jobs:
         release_name: flux-security ${{ matrix.tag }}
         prerelease: true
         body: |
-          View [Release Notes](https://github.com/${{ github.repository }}/blob/${{ github.ref }}/NEWS.md) for flux-security ${{ github.ref }}
+          View [Release Notes](https://github.com/${{ github.repository }}/blob/${{ github.ref }}/NEWS.md) for flux-security ${{ matrix.tag }}
 
     - name: upload tarball
       id: upload-tarball
