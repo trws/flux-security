@@ -1,3 +1,19 @@
+flux-security version 0.7.0 - 2022-06-06
+----------------------------------------
+
+## New Features
+
+ * document signing API (#137)
+
+## Fixes
+
+ * imp: fix kill functionality with unified cgroups hierarchy (#142)
+ * doc: fix manpage typo (#139)
+ * fix readthedocs build (#143)
+ * testsuite: fix spell checker and some spelling errors (#136)
+ * fix auto-deploy of flux-security release on tag (#135)
+
+
 flux-security version 0.6.0 - 2022-01-31
 ----------------------------------------
 
