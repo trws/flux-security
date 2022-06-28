@@ -141,12 +141,6 @@ matrix.add_build(
     image="el8",
 )
 
-# Fedora 33
-matrix.add_build(
-    name="fedora33",
-    image="fedora33",
-)
-
 # Fedora 34
 matrix.add_build(
     name="fedora34",
@@ -154,10 +148,17 @@ matrix.add_build(
     env=dict(CFLAGS="-fanalyzer"),
 )
 
-# Fedora 34 ASan
+# Fedora 35
 matrix.add_build(
-    name="fedora34 - asan",
-    image="fedora34",
+    name="fedora35",
+    image="fedora35",
+    env=dict(CFLAGS="-fanalyzer"),
+)
+
+# Fedora 35 ASan
+matrix.add_build(
+    name="fedora35 - asan",
+    image="fedora35",
     args="--enable-sanitizers"
 )
 print(matrix)
