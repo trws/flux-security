@@ -64,6 +64,12 @@ IMP_SOURCES = \
 	exec/user.c \
 	exec/exec.c
 
+if HAVE_PAM
+IMP_SOURCES += \
+	exec/pam.h \
+	exec/pam.c
+endif
+
 flux_imp_SOURCES = \
 	testconfig.c \
 	$(IMP_SOURCES)
