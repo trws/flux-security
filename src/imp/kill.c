@@ -83,6 +83,15 @@ static void check_and_kill_process (struct imp_state *imp, pid_t pid, int sig)
     if (!(p = pid_info_create ((pid_t) pid)))
         imp_die (1, "kill: failed to initialize pid info: %s",
                     strerror (errno));
+    if (sig == 0) {
+        printf ("pid=%ju owner=%ju cg_path=%s cg_owner=%ju",
+                 (uintmax_t) pid,
+                 (uintmax_t) p->pid_owner,
+                 p->cg_path,
+                 (uintmax_t) p->cg_owner);
+        pid_info_destroy (p);
+        return;
+    }
 
     /* Check if pid is in pids cgroup owned by IMP user */
     if (p->cg_owner != user
@@ -146,7 +155,9 @@ int imp_kill_unprivileged (struct imp_state *imp, struct kv *kv)
     if (imp->argc < 4)
         imp_die (1, "kill: Usage flux-imp kill SIGNAL PID");
 
-    if ((signum = strtol (imp->argv[2], &p, 10)) <= 0
+    errno = 0;
+    if ((signum = strtol (imp->argv[2], &p, 10)) < 0
+        || errno != 0
         || *p != '\0')
         imp_die (1, "kill: invalid SIGNAL %s", imp->argv[2]);
 
