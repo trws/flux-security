@@ -12,6 +12,12 @@ test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 
 flux_imp=${SHARNESS_BUILD_DIRECTORY}/src/imp/flux-imp
 
+sign=${SHARNESS_BUILD_DIRECTORY}/t/src/sign
+
+fake_imp_input() {
+        printf '{"J":"%s"}' $(echo $1 | $sign)
+}
+
 echo "# Using ${flux_imp}"
 
 test_expect_success 'flux-imp kill: returns error when run with no args' '
@@ -115,6 +121,76 @@ test_expect_success SUDO,SYSTEMD_CGROUP 'flux-imp kill: fails for nonexistent pi
 	    $flux_imp kill 15 $pid >${name}.log 2>&1 &&
 	test_debug "cat ${name}.log" &&
 	grep "No such file or directory"  ${name}.log
+'
+test_expect_success 'create config for flux-imp exec and signer' '
+	cat <<-EOF >sign-none.toml
+	allow-sudo = true
+	[sign]
+	max-ttl = 30
+	default-type = "none"
+	allowed-types = [ "none" ]
+	[exec]
+	allowed-users = [ "$(whoami)" ]
+	allowed-shells = [ "$(pwd)/sleeper.sh" ]
+	allow-unprivileged-exec = true
+	EOF
+'
+
+#  Need a setuid IMP for the following kill tests to work. This is required
+#   because on most systemd systems, sudo may migrate children to a root-owned
+#   cgroup, and `flux-imp kill` uses the ownership of the containing cgroup
+#   to determine authorization to signal a process
+test_expect_success SUDO 'attempt to create setuid copy of flux-imp for testing' '
+        sudo cp $flux_imp . &&
+        sudo chmod 4755 ./flux-imp
+'
+
+#  In case tests are running on filesystem with nosuid, check that permissions
+#   of flux-imp are actually setuid, and if so set SUID_ENABLED prereq
+#
+test -n "$(find ./flux-imp -perm 4755)" && test_set_prereq SUID_ENABLED
+
+#  In order for the following kill tests to work, the owner of the current
+#   cgroup must be the current user running the test.
+#
+test "$(FLUX_IMP_CONFIG_PATTERN=sign-none.toml ./flux-imp kill 0 $$ \
+	| sed 's/.*cg_owner=//')" = "$(id -u)" && test_set_prereq USER_CGROUP
+
+waitfile()
+{
+	count=0
+	while ! grep "$2" $1 >/dev/null 2>&12>&1; do
+	    sleep 0.2
+	    let count++
+	    test $count -gt 20 && break
+	done
+	grep "$2" $1 >/dev/null
+}
+
+test_expect_success NO_CHAIN_LINT,SUID_ENABLED,USER_CGROUP \
+'flux-imp kill signals children of another flux-imp' '
+	cat <<-EOF >sleeper.sh &&
+	#!/bin/sh
+	echo "\$@"
+	printf "\$PPID\n" >$(pwd)/sleeper.pid
+	/bin/sleep "\$@" &
+	pid=$! &&
+	trap "echo got SIGTERM; kill \$pid" SIGTERM
+	wait
+	echo sleep exited with \$? >&2
+	EOF
+	chmod +x sleeper.sh &&
+	export FLUX_IMP_CONFIG_PATTERN=sign-none.toml &&
+	fake_imp_input foo | \
+	  ./flux-imp exec $(pwd)/sleeper.sh 30 >sleeper.out 2>&1 &
+	pid=$! &&
+	waitfile sleeper.pid ".*" &&
+        test_debug "echo calling flux-imp kill $(cat sleeper.pid)" &&
+	FLUX_IMP_CONFIG_PATTERN=$(pwd)/unpriv.toml \
+            ./flux-imp kill 15 $(cat sleeper.pid) &&
+	wait $pid &&
+        test_debug "echo waiting for output file" &&
+	grep "got SIGTERM" sleeper.out
 '
 
 test_done
