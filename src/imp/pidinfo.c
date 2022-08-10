@@ -98,16 +98,20 @@ static int pid_systemd_cgroup_path (pid_t pid, char *buf, int len)
     FILE *fp;
     size_t size = 0;
     int n;
-    char file [4096];
+    char file [64];
     char *line = NULL;
     struct cgroup_info cgroup;
+    int saved_errno;
 
     if (cgroup_info_init (&cgroup) < 0)
         return -1;
 
-    n = snprintf (file, sizeof(file), "/proc/%ju/cgroup", (uintmax_t) pid);
-    if ((n < 0) || (n >= (int) sizeof(file))
-        || !(fp = fopen (file, "r")))
+    /*  64 bytes is guaranteed to hold /proc/%ju/comm, assuming largest
+     *   unsigned integer pid would be 21 characters (2^64-1) + 13 characters
+     *   for "/proc/" + "/cgroup" + some slack.
+     */
+    (void) snprintf (file, sizeof (file), "/proc/%ju/cgroup", (uintmax_t) pid);
+    if (!(fp = fopen (file, "r")))
         return -1;
 
     while ((n = getline (&line, &size, fp)) >= 0) {
@@ -129,8 +133,13 @@ static int pid_systemd_cgroup_path (pid_t pid, char *buf, int len)
         }
     }
 
+    if (rc < 0)
+        errno = ENOENT;
+
+    saved_errno = errno;
     free (line);
     fclose (fp);
+    errno = saved_errno;
     return rc;
 }
 
@@ -148,17 +157,21 @@ static uid_t path_owner (const char *path)
  */
 static uid_t pid_owner (pid_t pid)
 {
-    char path [128];
-    const int size = sizeof (path);
-    int n = snprintf (path, size, "/proc/%ju", (uintmax_t) pid);
-    if ((n < 0) || (n >= size))
-        return (pid_t) -1;
+    char path [64];
+
+    /*  /proc/%ju is guaranteed to fit in 64 bytes:
+     */
+    (void) snprintf (path, sizeof (path), "/proc/%ju", (uintmax_t) pid);
     return path_owner (path);
 }
 
 void pid_info_destroy (struct pid_info *pi)
 {
-    free (pi);
+    if (pi) {
+        int saved_errno = errno;
+        free (pi);
+        errno = saved_errno;
+    }
 }
 
 struct pid_info *pid_info_create (pid_t pid)
