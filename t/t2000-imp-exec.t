@@ -56,7 +56,7 @@ test_expect_success 'create configs for flux-imp exec and signer' '
 	allowed-types = [ "none" ]
 	[exec]
 	allowed-users = [ "$(whoami)" ]
-	allowed-shells = [ "id", "echo" ]
+	allowed-shells = [ "id", "echo", "$(pwd)/sleeper.sh" ]
 	allow-unprivileged-exec = true
 	EOF
 	cat <<-EOF >sign-none-allowed-munge.toml
@@ -144,5 +144,34 @@ test_expect_success SUDO 'flux-imp exec passes more than one argument to shell' 
 	test_debug "echo expecting uid=$(id -u), got $(cat -v id-sudo2.out)" &&
 	id --zero --user > id-sudo2.expected &&
         test_cmp id-sudo2.expected id-sudo2.out
+'
+test "$chain_lint" = "t" || test_set_prereq NO_CHAIN_LINT
+test_expect_success SUDO,NO_CHAIN_LINT 'flux-imp exec: setuid IMP lingers' '
+	cat <<-EOF >sleeper.sh &&
+	#!/bin/sh
+	printf "\$PPID\n" >$(pwd)/sleeper.pid
+	exec /bin/sleep "\$@"
+	EOF
+	chmod +x sleeper.sh &&
+	( export FLUX_IMP_CONFIG_PATTERN=sign-none.toml  && \
+          exec <&- 1>&- 2>&- && \
+          fake_imp_input foo | \
+	    $SUDO FLUX_IMP_CONFIG_PATTERN=sign-none.toml \
+	      $flux_imp exec $(pwd)/sleeper.sh 15 >linger.out 2>&1 & \
+	) &&
+	count=0 &&
+	while ! test -f sleeper.pid; do
+	    sleep 0.1
+	    let count++
+	    test $count -gt 20 && break
+	    test_debug "echo retrying count=${count}"
+	done &&
+        test_debug "cat sleeper.pid"
+	test -f sleeper.pid &&
+	pid=$(cat sleeper.pid) &&
+	test_debug "pstree -lup $pid" &&
+	test $(ps --no-header -o comm -p ${pid}) = "flux-imp" &&
+	kill -TERM $pid &&
+	wait
 '
 test_done

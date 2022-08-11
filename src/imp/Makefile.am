@@ -55,6 +55,8 @@ IMP_SOURCES = \
 	casign.c \
 	passwd.c \
 	passwd.h \
+	pidinfo.c \
+	pidinfo.h \
 	kill.c \
 	run.c \
 	exec/user.h \
@@ -125,7 +127,8 @@ TESTS = \
 	test_imp_log.t \
 	test_privsep.t \
 	test_impcmd.t \
-	test_passwd.t
+	test_passwd.t \
+	test_pidinfo.t
 
 check_PROGRAMS = \
 	$(TESTS)
@@ -169,3 +172,11 @@ test_passwd_t_SOURCES =  \
 	passwd.h
 
 test_passwd_t_LDADD = $(test_ldadd)
+
+test_pidinfo_t_SOURCES = \
+	test/pidinfo.c \
+	pidinfo.c \
+	pidinfo.h \
+	imp_log.c \
+	imp_log.h
+test_pidinfo_t_LDADD = $(test_ldadd)
