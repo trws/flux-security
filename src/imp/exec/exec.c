@@ -207,7 +207,8 @@ static void __attribute__((noreturn)) imp_exec (struct imp_exec *exec)
 
 static void fwd_signal (int signal)
 {
-    kill (imp_child, signal);
+    if (imp_child > 0)
+        kill (imp_child, signal);
 }
 
 /*  Setup signal handlers in the IMP for common signals which
