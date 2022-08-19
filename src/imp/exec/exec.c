@@ -243,7 +243,8 @@ static void setup_signal_forwarding (void)
                       signals[i],
                       strerror (errno));
     }
-    sigprocmask (SIG_SETMASK, &mask, NULL);
+    if (sigprocmask (SIG_SETMASK, &mask, NULL) < 0)
+       imp_die (1, "failed to block signals: %s", strerror (errno));
 }
 
 static void sigblock_all (void)
