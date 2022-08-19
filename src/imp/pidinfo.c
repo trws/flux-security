@@ -99,6 +99,11 @@ static int pid_command (pid_t pid, char *buf, int len)
     char file [64];
     int saved_errno;
 
+    if (buf == NULL || len <= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
     /*  64 bytes is guaranteed to hold /proc/%ju/comm, assuming largest
      *   unsigned integer pid would be 21 characters (2^64-1) + 11 characters
      *   for "/proc/" + "/comm" + some slack.
