@@ -114,7 +114,7 @@ static void pid_kill_tests (void)
     diag ("created test child %d", (int) pid);
 
     ok (pid_kill_children (pid, SIGTERM) == 3,
-        "pid_kill_children %d returned 1", (int) pid);
+        "pid_kill_children %d returned 3", (int) pid);
     ok (waitpid (pid, &status, 0) == pid,
         "waitpid returned %d",
         pid);
@@ -138,7 +138,7 @@ static void pid_kill_tests (void)
         BAIL_OUT ("testchild_create failed!");
 
     ok (pid_kill_children_fallback (pid, SIGTERM) == 3,
-        "pid_kill_children_fallback (%d) returned 1", (int) pid);
+        "pid_kill_children_fallback (%d) returned 3", (int) pid);
     ok (waitpid (pid, &status, 0) == pid,
         "waitpid returned %d",
         pid);

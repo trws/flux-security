@@ -99,6 +99,11 @@ static int pid_command (pid_t pid, char *buf, int len)
     char file [64];
     int saved_errno;
 
+    if (buf == NULL || len <= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
     /*  64 bytes is guaranteed to hold /proc/%ju/comm, assuming largest
      *   unsigned integer pid would be 21 characters (2^64-1) + 11 characters
      *   for "/proc/" + "/comm" + some slack.
@@ -107,7 +112,7 @@ static int pid_command (pid_t pid, char *buf, int len)
 
     if (!(fp = fopen (file, "r")))
         return -1;
-    if ((n = getline (&line, &size, fp)) < 0)
+    if (getline (&line, &size, fp) < 0)
         goto out;
     if ((n = strlen (line)) > len) {
         errno = ENOSPC;
@@ -250,10 +255,8 @@ static pid_t pid_ppid (pid_t pid)
     /*  /proc/%ju/status is guaranteed to fit in 64 bytes
      */
     (void) snprintf (path, len, "/proc/%ju/status", (uintmax_t) pid);
-    if (!(fp = fopen (path, "r"))) {
-        fprintf (stderr, "fopen %s: %s\n", path, strerror (errno));
+    if (!(fp = fopen (path, "r")))
         return (pid_t) -1;
-    }
 
     while ((n = getline (&line, &size, fp)) >= 0) {
         if (strncmp (line, "PPid:", 5) == 0) {
@@ -261,11 +264,10 @@ static pid_t pid_ppid (pid_t pid)
             while (isspace (*p))
                 ++p;
             if (parse_pid (p, &ppid) < 0)
-                goto out;
+                imp_warn ("parse_pid (%s): %s", p, strerror (errno));
             break;
         }
     }
-out:
     saved_errno = errno;
     free (line);
     fclose (fp);
