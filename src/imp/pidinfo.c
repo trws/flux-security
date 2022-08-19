@@ -255,10 +255,8 @@ static pid_t pid_ppid (pid_t pid)
     /*  /proc/%ju/status is guaranteed to fit in 64 bytes
      */
     (void) snprintf (path, len, "/proc/%ju/status", (uintmax_t) pid);
-    if (!(fp = fopen (path, "r"))) {
-        fprintf (stderr, "fopen %s: %s\n", path, strerror (errno));
+    if (!(fp = fopen (path, "r")))
         return (pid_t) -1;
-    }
 
     while ((n = getline (&line, &size, fp)) >= 0) {
         if (strncmp (line, "PPid:", 5) == 0) {
@@ -266,11 +264,10 @@ static pid_t pid_ppid (pid_t pid)
             while (isspace (*p))
                 ++p;
             if (parse_pid (p, &ppid) < 0)
-                goto out;
+                imp_warn ("parse_pid (%s): %s", p, strerror (errno));
             break;
         }
     }
-out:
     saved_errno = errno;
     free (line);
     fclose (fp);
