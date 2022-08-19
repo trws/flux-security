@@ -107,7 +107,7 @@ static int pid_command (pid_t pid, char *buf, int len)
 
     if (!(fp = fopen (file, "r")))
         return -1;
-    if ((n = getline (&line, &size, fp)) < 0)
+    if (getline (&line, &size, fp) < 0)
         goto out;
     if ((n = strlen (line)) > len) {
         errno = ENOSPC;
