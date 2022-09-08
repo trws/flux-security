@@ -55,6 +55,18 @@ exec.allow-unprivileged-exec
    to execute arbitrary commands as the Flux system instance owner userid
    (e.g. ``flux``)
 
+exec.pam-support
+   A boolean value which, if true, enables PAM support for the IMP exec
+   subcommand, allowing a ``flux`` PAM stack to be executed for multi
+   user jobs. If enabled, the ``flux`` PAM stack must exist and have
+   at least one ``auth`` and one ``session`` module configured, e.g.::
+
+     auth    required pam_localuser.so
+     session required pam_limits.so
+
+   This option requires that the flux-security project was built with
+   ``--enable-pam``.
+
 The following keys in the ``[run]`` table configure ``flux-imp run``
 support, which is used to configure the ``flux-imp run`` command, which
 is used to allow the Flux system instance user to execute a prolog,

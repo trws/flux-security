@@ -554,3 +554,6 @@ POSIX
 anymech
 enum
 NOVERIFY
+auth
+localuser
+pam
