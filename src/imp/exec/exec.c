@@ -33,7 +33,6 @@
 #include <wait.h>
 #include <jansson.h>
 
-
 #include "src/libutil/kv.h"
 #include "src/lib/context.h"
 #include "src/lib/sign.h"
@@ -44,6 +43,10 @@
 #include "privsep.h"
 #include "passwd.h"
 #include "user.h"
+
+#if HAVE_PAM
+#include "pam.h"
+#endif
 
 struct imp_exec {
     struct passwd *imp_pwd;
@@ -94,6 +97,15 @@ static bool imp_exec_unprivileged_allowed (struct imp_exec *exec)
 {
     return cf_bool (cf_get_in (exec->conf, "allow-unprivileged-exec"));
 }
+
+
+#if HAVE_PAM
+/* Check for PAM support, but default to not using PAM for now.
+ */
+static bool imp_supports_pam (struct imp_exec *exec) {
+    return cf_bool (cf_get_in (exec->conf, "pam-support"));
+}
+#endif
 
 static void imp_exec_destroy (struct imp_exec *exec)
 {
@@ -289,7 +301,14 @@ int imp_exec_privileged (struct imp_state *imp, struct kv *kv)
     if (privsep_wait (imp->ps) < 0)
         exit (1);
 
+#if HAVE_PAM
     /* Call privileged IMP plugins/containment */
+    if (imp_supports_pam (exec)) {
+        struct passwd *user_pwd = passwd_from_uid (exec->userid);
+        if (pam_setup (user_pwd->pw_name) < 0)
+            imp_die (1, "exec: PAM stack failure");
+    }
+#endif /* HAVE_PAM */
 
     /* Block signals so parent IMP isn't unduly terminated */
     sigblock_all ();
@@ -320,7 +339,11 @@ int imp_exec_privileged (struct imp_state *imp, struct kv *kv)
             imp_die (1, "waitpid: %s", strerror (errno));
     }
 
+#if HAVE_PAM
     /* Call privliged IMP plugins/containment finalization */
+    if (imp_supports_pam (exec))
+        pam_finish ();
+#endif /* HAVE_PAM */
 
     /* Exit with status of the child process */
     if (WIFEXITED (status))
