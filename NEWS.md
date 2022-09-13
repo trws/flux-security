@@ -1,3 +1,17 @@
+flux-security version 0.8.0 - 2022-09-13
+----------------------------------------
+
+## New Features
+
+ * allow privileged IMP to linger during a job (#150)
+ * imp: exec: add PAM session support (#151)
+
+## Cleanup
+
+ * imp: address code review comments (#152)
+ * ci: remove fedora33 add fedora35 to ci builds (#149)
+ * github: fix typo in deploy action (#146)
+
 flux-security version 0.7.0 - 2022-06-06
 ----------------------------------------
 
