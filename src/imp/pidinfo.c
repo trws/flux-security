@@ -382,10 +382,6 @@ int pid_kill_children (pid_t pid, int sig)
         return -1;
     }
 
-    (void) snprintf (path, sizeof (path), "/proc/%ju", (uintmax_t) pid);
-    if (access (path, R_OK) < 0)
-        return -1;
-
     (void) snprintf (path, sizeof (path),
                     "/proc/%ju/task/%ju/children",
                     (uintmax_t) pid,
