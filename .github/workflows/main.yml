@@ -32,7 +32,7 @@ jobs:
   
   ci:
     needs: [ generate-matrix ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       FLUX_TESTS_LOGFILE: t
     strategy:
