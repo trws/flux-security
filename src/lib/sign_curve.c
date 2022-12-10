@@ -240,7 +240,6 @@ static int verify_cert_ca (flux_security_t *ctx, struct sign_curve *sc,
     if (!sc->ca) { // load CA context on first use
         const cf_t *ca_config;
         struct ca *ca;
-        ca_error_t e;
 
         if (!(ca_config = security_get_config (ctx, "ca"))) {
             security_error (ctx, "sign-curve-verify: [ca] config missing");
