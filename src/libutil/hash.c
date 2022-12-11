@@ -446,7 +446,7 @@ hash_node_alloc (void)
  *  Returns a ptr to the object, or NULL if memory allocation fails.
  */
     size_t size;
-    struct hash_node *p;
+    struct hash_node *p = NULL;
     int i;
 
     assert (HASH_NODE_ALLOC_NUM > 0);
