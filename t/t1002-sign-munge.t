@@ -36,6 +36,7 @@ export FLUX_IMP_CONFIG_PATTERN=${SHARNESS_TRASH_DIRECTORY}/sign.toml
 test_expect_success SIDEMUNGE 'start munged' '
 	munged_start_daemon
 '
+export MUNGE_SOCKET   # set by 03-munge.sh, used below and xsign_munge
 
 test_expect_success 'munge works' '
 	munge --socket ${MUNGE_SOCKET} </dev/null \

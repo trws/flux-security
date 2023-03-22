@@ -150,7 +150,7 @@ test_expect_success SUDO,NO_CHAIN_LINT 'flux-imp exec: setuid IMP lingers' '
 	cat <<-EOF >sleeper.sh &&
 	#!/bin/sh
 	printf "\$PPID\n" >$(pwd)/sleeper.pid
-	exec /bin/sleep "\$@"
+	exec sleep "\$@"
 	EOF
 	chmod +x sleeper.sh &&
 	( export FLUX_IMP_CONFIG_PATTERN=sign-none.toml  && \

@@ -13,6 +13,9 @@ test -n "$FLUX_TESTS_LOGFILE" && set -- "$@" --logfile
 flux_imp=${SHARNESS_BUILD_DIRECTORY}/src/imp/flux-imp
 sign=${SHARNESS_BUILD_DIRECTORY}/t/src/sign
 
+# pre-resolve id in case it isn't in standard path
+id=$(which id)
+
 echo "# Using ${flux_imp}"
 
 test_expect_success 'flux-imp run returns error when run with no args' '
@@ -52,10 +55,10 @@ test_expect_success 'create configs for flux-imp exec and signer' '
 test_expect_success 'create test shell scripts' '
 	cat <<-EOF >$TESTDIR/test.sh &&
 	#!/bin/sh
-	echo uid=\$(id -u)
-	echo ruid=\$(id -r -u)
-	echo gid=\$(id -g)
-	echo rgid=\$(id -r -g)
+	echo uid=\$($id -u)
+	echo ruid=\$($id -r -u)
+	echo gid=\$($id -g)
+	echo rgid=\$($id -r -g)
 	env
 	EOF
 	chmod +x $TESTDIR/test.sh &&

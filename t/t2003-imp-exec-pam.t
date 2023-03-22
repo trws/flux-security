@@ -18,8 +18,9 @@ if ! grep -q pam version.out; then
 	test_done
 fi
 
+export PAM_WRAP_LIB=$(pkg-config --libs pam_wrapper)
 #  Check for libpam_wrapper.so
-LD_PRELOAD=libpam_wrapper.so $flux_imp version >ld_preload.out 2>&1
+LD_PRELOAD=$PAM_WRAP_LIB $flux_imp version >ld_preload.out 2>&1
 if grep -i error ld_preload.out >/dev/null 2>&1; then
 	skip_all='libpam_wrapper.so not found. Skipping all tests'
 	test_done
@@ -60,7 +61,7 @@ test_expect_success 'create IMP test script for PAM testing' '
 	cat >imp-pam.sh <<-EOF &&
 	#!/bin/sh
 	export PAM_WRAPPER=1
-	export LD_PRELOAD=libpam_wrapper.so
+	export LD_PRELOAD=$PAM_WRAP_LIB
 	export PAM_WRAPPER_SERVICE_DIR="$(pwd)"/pam.d
 	export FLUX_IMP_CONFIG_PATTERN="$(pwd)"/sign-none.toml
 	exec $flux_imp "\$@"
